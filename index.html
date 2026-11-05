@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Super-agent Explorer · Agent 系统设计交互式探索</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4f7fc; --panel:#ffffff; --panel-2:#f3f6fc; --panel-3:#eaf0fb;
+    --line:#e2e8f4; --line-2:#cdd7ea;
+    --ink:#233065; --ink-2:#3a4680; --muted:#7d88b4; --faint:#a9b3d4;
+    --blue:#1345c9; --blue-deep:#0d2f96; --blue-tint:#eaf0fd; --blue-border:#b9c9ee;
+    --link:#2e5aa8; --ok:#2e9e6b;
+    --mono:'Geist Mono', ui-monospace, Menlo, monospace;
+    --sans:'Geist','Noto Sans SC','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;-webkit-font-smoothing:antialiased}
+  .app{max-width:1680px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+  button{font-family:inherit;cursor:pointer}
+  .hidden{display:none!important}
+
+  /* 顶栏 */
+  .topbar{display:flex;align-items:center;gap:18px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-box{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--blue) 0%,var(--blue-deep) 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-size:11px;font-weight:600}
+  .logo-name{font-weight:700;font-size:13px;letter-spacing:.04em}
+  .logo-sub{font-size:10px;color:var(--muted);margin-top:1px}
+  .crumb{text-align:center}
+  .crumb .step{font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:.08em}
+  .crumb .t{font-weight:600;font-size:14px;margin-top:2px}
+  .spacer{flex:1}
+  .tabs{display:flex;gap:6px}
+  .tab{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--panel)}
+  .tab.active{color:var(--blue);border-color:var(--blue-border);background:var(--blue-tint);font-weight:600}
+  .tab .n{font-family:var(--mono);font-size:9px;color:var(--faint);margin-right:5px}
+  .tab.active .n{color:var(--blue)}
+  .progress{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:right}
+  .progress b{color:var(--ink);font-weight:600}
+  .progress .bar{width:110px;height:4px;border-radius:2px;background:var(--panel-3);margin-top:5px;overflow:hidden}
+  .progress .bar i{display:block;height:100%;background:var(--blue);transition:width .3s}
+
+  /* 三栏 */
+  .cols{display:grid;grid-template-columns:212px minmax(0,1fr) 300px;gap:16px;padding:16px;flex:1;align-items:start}
+  .center{display:flex;flex-direction:column;min-width:0;gap:14px}
+  .toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
+  .toc-head{display:flex;justify-content:space-between;align-items:baseline;font-weight:600;font-size:12px}
+  .toc-head .c{font-family:var(--mono);color:var(--faint);font-size:10px}
+  .toc-search{margin-top:12px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;display:flex;gap:8px;align-items:center;background:var(--panel-2)}
+  .toc-search input{border:0;outline:0;background:transparent;font-size:11px;color:var(--ink);width:100%;font-family:var(--sans)}
+  .toc-search input::placeholder{color:var(--faint)}
+  .toc-groups{margin-top:12px;display:flex;flex-direction:column;gap:12px}
+  .tg{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .tg-h{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+  .ti{display:flex;align-items:center;gap:8px;padding:9px 10px;font-size:12px;color:var(--ink-2);border-bottom:1px solid var(--line);cursor:pointer;user-select:none}
+  .ti:last-child{border-bottom:0}
+  .ti:hover{background:var(--panel-2)}
+  .ti .dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--line-2);flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff}
+  .ti.done .dot{border-color:var(--ok);background:var(--ok)}
+  .ti.done .dot::after{content:"✓"}
+  .ti.active{background:var(--blue-tint);color:var(--blue);font-weight:600}
+  .ti.active .dot{border-color:var(--blue);background:radial-gradient(circle,var(--blue) 40%,transparent 45%)}
+  .ti .en{font-family:var(--mono);font-size:8.5px;color:var(--faint);letter-spacing:.06em;display:block;margin-top:1px}
+  .steps{margin-top:14px;border-top:1px dashed var(--line-2);padding-top:12px}
+  .steps-h{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px}
+  .st{display:flex;gap:10px;padding:6px 4px;font-size:12px;color:var(--ink-2);align-items:flex-start;cursor:pointer;border-radius:6px}
+  .st:hover{background:var(--panel-2)}
+  .st.cur{background:var(--blue-tint);color:var(--blue);font-weight:600}
+  .st .num{width:16px;height:16px;border-radius:4px;background:var(--blue-tint);border:1px solid var(--blue-border);color:var(--blue);font-family:var(--mono);font-size:9px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;margin-top:1px}
+  .st.cur .num{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .toc-foot{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-family:var(--mono);font-size:9px;color:var(--faint)}
+
+  /* 中栏导读 */
+  .demo{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;position:relative;overflow:hidden;display:flex;flex-direction:column}
+  .demo-top{display:flex;justify-content:space-between;align-items:center}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg span{padding:5px 11px;font-size:11px;color:var(--muted)}
+  .seg span.on{background:var(--blue);color:#fff;font-weight:600}
+  .demo-tag{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.1em}
+  .eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--muted);margin-top:14px;text-transform:uppercase}
+  h1.title{font-size:21px;font-weight:700;margin-top:4px}
+  .scenes{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+  .scene{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 12px;background:var(--panel)}
+  .scene.on{color:var(--blue);border-color:var(--blue-border);background:var(--blue-tint);font-weight:600}
+  .scene:hover{border-color:var(--blue-border)}
+  .ghost{position:absolute;right:18px;top:44px;font-family:var(--mono);font-size:150px;font-weight:600;color:#eef2fb;line-height:1;pointer-events:none;user-select:none}
+  .lead{margin-top:14px;font-size:12.5px;line-height:1.8;color:var(--ink-2);max-width:56ch}
+  .lead b{color:var(--ink)}
+  .facts{display:grid;grid-template-columns:1.1fr 1fr .9fr;gap:10px;margin-top:16px}
+  .fact{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel)}
+  .fact .v{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--blue)}
+  .fact .k{font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.5}
+  .caption{margin-top:14px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);padding:12px 14px;transition:border-color .2s}
+  .caption.hot{border-color:var(--blue-border);background:var(--blue-tint)}
+  .caption .cap-h{display:flex;align-items:center;gap:10px;font-weight:600;font-size:13px}
+  .caption .cap-h .num{width:20px;height:20px;border-radius:6px;background:var(--blue);color:#fff;font-family:var(--mono);font-size:10px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .caption p{margin-top:6px;font-size:12px;line-height:1.7;color:var(--ink-2)}
+
+  /* 整幅图卡 */
+  .diagram-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin:0;padding:14px 16px}
+  .dc-h{display:flex;justify-content:space-between;align-items:baseline}
+  .dc-h .l{font-weight:600;font-size:13px}
+  .dc-h .l .c{font-family:var(--mono);font-size:9px;color:var(--faint);margin-left:10px;letter-spacing:.08em}
+  .dc-h .r{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.1em}
+  .diagram-wrap{margin-top:8px;overflow-x:auto}
+  .svgpane{display:none;width:100%;min-width:840px;height:auto}
+  .svgpane.on{display:block}
+
+  /* 边组交互态 */
+  .fe{transition:opacity .28s}
+  .fe.dim{opacity:.16}
+  .fe.hot line,.fe.hot path{stroke:#1345c9!important;stroke-width:1.6!important}
+  .fe.hot .chip-r{fill:#1345c9;stroke:#1345c9}
+  .fe.hot .chip-t{fill:#ffffff}
+  .chip-t{fill:#1345c9}
+
+  /* 执行轨迹 */
+  .trace{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin:0;padding:12px 16px}
+  .trace-h{display:flex;justify-content:space-between;align-items:center}
+  .trace-h .l{font-weight:600;font-size:12px}
+  .trace-h .l .c{font-family:var(--mono);font-size:9px;color:var(--faint);margin-left:8px;letter-spacing:.08em}
+  .trace-ctl{display:flex;gap:6px;align-items:center;font-size:11px}
+  .btn{border:1px solid var(--line);border-radius:6px;padding:4px 10px;background:var(--panel);color:var(--ink-2)}
+  .btn:hover{border-color:var(--blue-border);color:var(--blue)}
+  .btn.play{background:var(--blue);color:#fff;border-color:var(--blue);min-width:64px}
+  .btn:disabled{opacity:.4;cursor:default}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
+  th{font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--faint);text-align:left;font-weight:500;padding:6px 10px;border-bottom:1px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+  tr.on td{background:var(--panel-2)}
+  tr.done-step td{color:var(--muted)}
+  td .num{width:16px;height:16px;border-radius:50%;background:var(--blue);color:#fff;font-family:var(--mono);font-size:9px;display:inline-flex;align-items:center;justify-content:center}
+  tr.done-step td .num{background:var(--ok);color:#fff}
+  td.dim .num{background:var(--panel-3);color:var(--muted)}
+  td.ev{font-family:var(--mono);font-size:10.5px;color:var(--ink);letter-spacing:.03em}
+  .note{margin-top:8px;font-size:10.5px;color:var(--muted)}
+
+  /* 右栏 */
+  .detail{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
+  .dt-h{display:flex;justify-content:space-between;align-items:baseline;font-weight:600;font-size:13px}
+  .dt-h .c{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.1em}
+  .dt-tabs{display:flex;gap:6px;margin-top:12px}
+  .dt-tabs span{font-size:11px;color:var(--muted);padding:5px 12px;border-radius:8px;border:1px solid var(--line);cursor:pointer}
+  .dt-tabs span.on{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:600}
+  .dt-body{margin-top:12px}
+  .dt-body h4{font-size:12px;color:var(--ink);margin:14px 0 6px}
+  .dt-body h4:first-child{margin-top:0}
+  .dt-body p,.dt-body li{font-size:12px;line-height:1.75;color:var(--ink-2)}
+  .dt-body ul{padding-left:16px}
+  .dt-body code{font-family:var(--mono);font-size:10.5px;background:var(--panel-3);border-radius:4px;padding:0 4px}
+  .kv{display:flex;gap:8px;margin-top:8px;font-size:11px;color:var(--ink-2)}
+  .kv .k{font-family:var(--mono);color:var(--blue);flex:0 0 auto}
+  .code{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);padding:10px 12px;font-family:var(--mono);font-size:10px;line-height:1.7;color:var(--ink-2);white-space:pre-wrap;word-break:break-word}
+  .code .cm{color:var(--faint)}
+  .src .sh{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px}
+  .src-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--panel)}
+  .src-card .t{font-size:12px;font-weight:600;color:var(--ink)}
+  .src-card .s{font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.6}
+  .foot{padding:0 16px 14px;font-family:var(--mono);font-size:9px;color:var(--faint);display:flex;justify-content:space-between}
+  @media (max-width:1400px){
+    .cols{grid-template-columns:200px minmax(0,1fr)}
+    .detail{grid-column:1 / -1;position:static;max-height:none;overflow:visible}
+  }
+  @media (max-width:1100px){
+    .cols{grid-template-columns:minmax(0,1fr)}
+    .toc{position:static;max-height:none;overflow:visible}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-box">SA</div>
+      <div>
+        <div class="logo-name">SUPER-AGENT EXPLORER</div>
+        <div class="logo-sub">Agent 系统设计 · 交互式探索</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="crumb">
+      <div class="step" id="crumbStep">正在探索&nbsp;&nbsp;01 / 05</div>
+      <div class="t" id="crumbTitle">双层架构与订阅直通</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="tabs" id="groupTabs">
+      <div class="tab active" data-g="0"><span class="n">01</span>系统结构</div>
+      <div class="tab" data-g="1"><span class="n">02</span>事件驱动</div>
+      <div class="tab" data-g="2"><span class="n">03</span>持久在线</div>
+    </div>
+    <div class="progress">
+      学习进度&nbsp;&nbsp;<b id="progTxt">0 / 5</b>
+      <div class="bar"><i id="progBar" style="width:0%"></i></div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <!-- 左栏 -->
+    <div class="toc">
+      <div class="toc-head">技术目录 <span class="c">5</span></div>
+      <div class="toc-search">⌕&nbsp;<input id="searchBox" placeholder="搜索模块、机制…"></div>
+      <div class="toc-groups" id="tocGroups"></div>
+      <div class="steps">
+        <div class="steps-h">主流程步骤</div>
+        <div id="stepList"></div>
+      </div>
+      <div class="toc-foot" id="tocFoot"></div>
+    </div>
+    <div class="center">
+
+
+    <!-- 中栏 -->
+    <div class="demo">
+      <div class="demo-top">
+        <div class="seg"><span class="on">◈ 机制演示</span><span id="segMap" style="cursor:default">⛓ 知识图谱</span></div>
+        <div class="demo-tag">教学模型 · 抽象节点 非物理拓扑</div>
+      </div>
+      <div class="eyebrow" id="topicEyebrow"></div>
+      <h1 class="title" id="topicTitle"></h1>
+      <div class="scenes" id="sceneList"></div>
+      <div class="ghost" id="ghostNum">01</div>
+      <div class="lead" id="topicLead"></div>
+      <div class="facts" id="factRow"></div>
+      <div class="caption" id="capBox">
+        <div class="cap-h"><span class="num" id="capNum">◆</span><span id="capTitle"></span></div>
+        <p id="capText"></p>
+      </div>
+    </div>
+
+  <!-- 整幅:机制演示图 -->
+  <div class="diagram-card">
+    <div class="dc-h">
+      <div class="l">机制演示 <span class="c" id="dcSub">事件流 · 请求传递</span></div>
+      <div class="r" id="dcScene">场景 ▸ 主流程</div>
+    </div>
+    <div class="diagram-wrap" id="diagramWrap">
+
+    <!-- ════════ T1 双层架构与订阅直通 ════════ -->
+    <svg id="svg-t1" class="svgpane on" viewBox="0 0 960 640" role="img" aria-labelledby="t1-title t1-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="t1-title">Super-agent 双层调度架构</title>
+      <desc id="t1-desc">事件从信道进入,经两级过滤由 Router 层分派给 Worker 层执行;已订阅 Thread 的后续事件直通 Worker;Worker 经端侧 daemon 在本地环境执行,向 Router 汇报后统一回复用户。</desc>
+      <defs>
+        <marker id="a1" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#7d88b4"/></marker>
+        <marker id="a1c" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1345c9"/></marker>
+        <marker id="a1l" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+      </defs>
+      <rect width="960" height="640" fill="#ffffff"/>
+      <rect x="208" y="144" width="632" height="384" rx="8" fill="rgba(19,69,201,0.02)" stroke="rgba(19,69,201,0.10)" stroke-width="0.8"/>
+      <rect x="216" y="148" width="104" height="12" rx="2" fill="#ffffff"/>
+      <text x="268" y="157" fill="rgba(35,48,101,0.42)" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.14em">CLOUD · 云端无状态</text>
+      <rect x="848" y="144" width="104" height="160" rx="8" fill="rgba(19,69,201,0.02)" stroke="rgba(19,69,201,0.10)" stroke-width="0.8"/>
+      <rect x="856" y="148" width="72" height="12" rx="2" fill="#ffffff"/>
+      <text x="892" y="157" fill="rgba(35,48,101,0.42)" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.14em">BYOM · 端侧</text>
+
+      <g class="fe" data-s="1">
+        <line x1="152" y1="244" x2="296" y2="244" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a1)"/>
+        <rect x="190" y="222" width="68" height="12" rx="2" fill="#ffffff"/>
+        <text x="224" y="231" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">TRIGGER</text>
+        <rect class="chip-r" x="216" y="237" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="224" y="247" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">1</text>
+      </g>
+      <g class="fe" data-s="2">
+        <line x1="408" y1="244" x2="416" y2="244" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a1)"/>
+        <rect class="chip-r" x="404" y="237" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="412" y="247" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">2</text>
+      </g>
+      <g class="fe" data-s="3">
+        <line x1="568" y1="244" x2="664" y2="244" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a1)"/>
+        <rect x="586" y="222" width="60" height="12" rx="2" fill="#ffffff"/>
+        <text x="616" y="231" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">SPAWN</text>
+        <rect class="chip-r" x="608" y="237" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="616" y="247" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">3</text>
+      </g>
+      <g class="fe" data-s="3">
+        <line x1="460" y1="276" x2="460" y2="348" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a1)"/>
+        <rect x="468" y="304" width="76" height="12" rx="2" fill="#ffffff"/>
+        <text x="506" y="313" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">SUBSCRIBE</text>
+        <rect class="chip-r" x="452" y="305" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="460" y="315" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">3</text>
+      </g>
+      <g class="fe" data-s="4">
+        <path d="M 568,380 H 668 Q 676,380 676,372 V 292 Q 676,284 684,284 H 692 Q 700,284 700,276" fill="none" stroke="#1345c9" stroke-width="1.4" marker-end="url(#a1c)"/>
+        <rect x="584" y="352" width="56" height="12" rx="2" fill="#ffffff"/>
+        <text x="612" y="361" fill="#1345c9" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">DIRECT</text>
+        <rect class="chip-r" x="610" y="373" width="16" height="14" rx="3" fill="#ffffff" stroke="#1345c9" stroke-width="0.8"/><text class="chip-t" x="618" y="383" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">4</text>
+      </g>
+      <g class="fe" data-s="5">
+        <line x1="792" y1="244" x2="852" y2="244" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#a1l)"/>
+        <rect class="chip-r" x="814" y="237" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="822" y="247" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">5</text>
+      </g>
+      <g class="fe" data-s="5">
+        <path d="M 660,284 V 480 Q 660,488 652,488 H 568" fill="none" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a1)"/>
+        <rect x="584" y="418" width="48" height="12" rx="2" fill="#ffffff"/>
+        <text x="608" y="427" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">WRITE</text>
+        <rect class="chip-r" x="652" y="413" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="660" y="423" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">5</text>
+      </g>
+      <g class="fe" data-s="6">
+        <path d="M 664,180 V 152 H 520 V 172 Q 520,180 520,180" fill="none" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a1)"/>
+        <rect x="556" y="130" width="64" height="12" rx="2" fill="#ffffff"/>
+        <text x="588" y="139" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">REPORT</text>
+        <rect class="chip-r" x="584" y="145" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="592" y="155" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">6</text>
+      </g>
+      <g class="fe" data-s="6">
+        <path d="M 452,180 V 136 Q 452,128 444,128 H 104 Q 96,128 96,136 V 212" fill="none" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a1)"/>
+        <rect x="230" y="106" width="52" height="12" rx="2" fill="#ffffff"/>
+        <text x="256" y="115" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">REPLY</text>
+        <rect class="chip-r" x="262" y="121" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="270" y="131" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">6</text>
+      </g>
+      <g>
+        <line x1="696" y1="140" x2="696" y2="180" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a1)"/>
+        <rect x="704" y="150" width="52" height="12" rx="2" fill="#ffffff"/>
+        <text x="730" y="159" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">WATCH</text>
+      </g>
+
+      <!-- 节点 -->
+      <rect x="40" y="212" width="112" height="64" rx="6" fill="#ffffff"/>
+      <rect x="40" y="212" width="112" height="64" rx="6" fill="rgba(125,136,180,0.10)" stroke="#a9b3d4" stroke-width="1"/>
+      <rect x="48" y="218" width="34" height="12" rx="2" fill="transparent" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/>
+      <text x="65" y="227" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">IN</text>
+      <text x="96" y="250" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">用户与信道</text>
+      <text x="96" y="266" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">IM · GH · MAIL · CI</text>
+
+      <rect x="296" y="212" width="112" height="64" rx="6" fill="#ffffff"/>
+      <rect x="296" y="212" width="112" height="64" rx="6" fill="#ffffff" stroke="#233065" stroke-width="1"/>
+      <rect x="304" y="218" width="36" height="12" rx="2" fill="transparent" stroke="rgba(35,48,101,0.4)" stroke-width="0.8"/>
+      <text x="322" y="227" fill="#3a4680" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">FILTER</text>
+      <text x="352" y="250" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">两级过滤</text>
+      <text x="352" y="266" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">程序规则 → 语义判断</text>
+
+      <rect x="416" y="180" width="152" height="96" rx="6" fill="#ffffff"/>
+      <rect x="416" y="180" width="152" height="96" rx="6" fill="#eaf0fd" stroke="#1345c9" stroke-width="1.4"/>
+      <rect x="424" y="186" width="42" height="12" rx="2" fill="transparent" stroke="rgba(19,69,201,0.4)" stroke-width="0.8"/>
+      <text x="445" y="195" fill="#1345c9" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">ROUTER</text>
+      <text x="492" y="228" fill="#233065" font-size="13" font-weight="600" font-family="var(--sans)" text-anchor="middle">Router 层</text>
+      <text x="492" y="244" fill="#3a4680" font-size="8.5" font-family="var(--mono)" text-anchor="middle">常驻 · 轻模型 · 全局序点</text>
+      <text x="492" y="260" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">只分派,不执行</text>
+
+      <rect x="664" y="180" width="152" height="96" rx="6" fill="#ffffff"/>
+      <rect x="664" y="180" width="152" height="96" rx="6" fill="#ffffff" stroke="#233065" stroke-width="1"/>
+      <rect x="672" y="186" width="42" height="12" rx="2" fill="transparent" stroke="rgba(35,48,101,0.4)" stroke-width="0.8"/>
+      <text x="693" y="195" fill="#3a4680" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">WORKER</text>
+      <text x="740" y="228" fill="#233065" font-size="13" font-weight="600" font-family="var(--sans)" text-anchor="middle">Worker 层 ×N</text>
+      <text x="740" y="244" fill="#3a4680" font-size="8.5" font-family="var(--mono)" text-anchor="middle">上下文隔离 · 强模型</text>
+      <text x="740" y="260" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">不直接对人</text>
+
+      <rect x="416" y="348" width="152" height="64" rx="6" fill="#ffffff"/>
+      <rect x="416" y="348" width="152" height="64" rx="6" fill="rgba(35,48,101,0.05)" stroke="#7d88b4" stroke-width="1"/>
+      <rect x="424" y="354" width="40" height="12" rx="2" fill="transparent" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/>
+      <text x="444" y="363" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">TABLE</text>
+      <text x="492" y="384" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">Thread 订阅</text>
+      <text x="492" y="400" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">多对多 · 直通路由表</text>
+
+      <rect x="416" y="460" width="152" height="56" rx="6" fill="#ffffff"/>
+      <rect x="416" y="460" width="152" height="56" rx="6" fill="rgba(35,48,101,0.05)" stroke="#7d88b4" stroke-width="1"/>
+      <rect x="424" y="466" width="24" height="12" rx="2" fill="transparent" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/>
+      <text x="436" y="475" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">DB</text>
+      <text x="492" y="492" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">状态库</text>
+      <text x="492" y="507" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">会话状态 · 持久化</text>
+
+      <rect x="640" y="96" width="176" height="44" rx="6" fill="#ffffff"/>
+      <rect x="640" y="96" width="176" height="44" rx="6" fill="rgba(35,48,101,0.02)" stroke="rgba(35,48,101,0.30)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="728" y="116" fill="#3a4680" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">Watchdog</text>
+      <text x="728" y="131" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">外部控制回路 · 盯进展</text>
+
+      <rect x="852" y="212" width="104" height="64" rx="6" fill="#ffffff"/>
+      <rect x="852" y="212" width="104" height="64" rx="6" fill="rgba(35,48,101,0.03)" stroke="rgba(35,48,101,0.30)" stroke-width="1"/>
+      <text x="904" y="246" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">端侧 daemon</text>
+      <text x="904" y="264" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">本地执行环境</text>
+
+      <line x1="30" y1="596" x2="930" y2="596" stroke="rgba(35,48,101,0.10)" stroke-width="0.8"/>
+      <text x="30" y="612" fill="#7d88b4" font-size="8" font-family="var(--mono)" letter-spacing="0.14em">LEGEND</text>
+      <rect x="100" y="604" width="12" height="12" rx="3" fill="#eaf0fd" stroke="#1345c9" stroke-width="1"/>
+      <text x="118" y="613" fill="#3a4680" font-size="8.5" font-family="var(--sans)">焦点模块</text>
+      <rect x="176" y="604" width="12" height="12" rx="3" fill="#ffffff" stroke="#233065" stroke-width="1"/>
+      <text x="194" y="613" fill="#3a4680" font-size="8.5" font-family="var(--sans)">执行模块</text>
+      <rect x="252" y="604" width="12" height="12" rx="3" fill="rgba(35,48,101,0.05)" stroke="#7d88b4" stroke-width="1"/>
+      <text x="270" y="613" fill="#3a4680" font-size="8.5" font-family="var(--sans)">状态存储</text>
+      <rect x="328" y="604" width="12" height="12" rx="3" fill="rgba(35,48,101,0.02)" stroke="rgba(35,48,101,0.3)" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="346" y="613" fill="#3a4680" font-size="8.5" font-family="var(--sans)">外部/监控</text>
+      <line x1="424" y1="610" x2="452" y2="610" stroke="#7d88b4" stroke-width="1.2"/>
+      <text x="458" y="613" fill="#3a4680" font-size="8.5" font-family="var(--sans)">同步</text>
+      <line x1="490" y1="610" x2="518" y2="610" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="524" y="613" fill="#3a4680" font-size="8.5" font-family="var(--sans)">异步/回报</text>
+      <line x1="592" y1="610" x2="620" y2="610" stroke="#1345c9" stroke-width="1.4"/>
+      <text x="626" y="613" fill="#3a4680" font-size="8.5" font-family="var(--sans)">直通快路径</text>
+      <line x1="700" y1="610" x2="728" y2="610" stroke="#2e5aa8" stroke-width="1.2"/>
+      <text x="734" y="613" fill="#3a4680" font-size="8.5" font-family="var(--sans)">跨边界工具调用</text>
+    </svg>
+
+    <!-- ════════ T2 上下文组织与链式召回 ════════ -->
+    <svg id="svg-t2" class="svgpane" viewBox="0 0 960 520" role="img" aria-labelledby="t2-title t2-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="t2-title">上下文组织:Inline &amp; Spill 与链式召回</title>
+      <desc id="t2-desc">上下文窗口当 Cache 管:近期信息 Inline 进窗口,超长内容 Spill 到窗口外留引用;对象间用 ID 构成引用图,模型沿引用逐跳召回上下文。</desc>
+      <defs>
+        <marker id="a2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#7d88b4"/></marker>
+        <marker id="a2c" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1345c9"/></marker>
+      </defs>
+      <rect width="960" height="520" fill="#ffffff"/>
+
+      <g class="fe" data-s="1">
+        <path d="M 115,380 V 330 Q 115,322 123,322 H 422 Q 430,322 430,314 V 150" fill="none" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a2)"/>
+        <rect x="240" y="300" width="52" height="12" rx="2" fill="#ffffff"/>
+        <text x="266" y="309" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">INJECT</text>
+        <rect class="chip-r" x="258" y="315" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="266" y="325" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">1</text>
+      </g>
+      <g class="fe" data-s="2">
+        <line x1="190" y1="412" x2="270" y2="412" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a2)"/>
+        <rect x="200" y="390" width="60" height="12" rx="2" fill="#ffffff"/>
+        <text x="230" y="399" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">INLINE</text>
+        <rect class="chip-r" x="222" y="405" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="230" y="415" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">2</text>
+      </g>
+      <g class="fe" data-s="3">
+        <line x1="430" y1="412" x2="510" y2="412" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a2)"/>
+        <rect x="440" y="390" width="60" height="12" rx="2" fill="#ffffff"/>
+        <text x="470" y="399" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">NEXT ID</text>
+        <rect class="chip-r" x="462" y="405" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="470" y="415" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">3</text>
+      </g>
+      <g class="fe" data-s="4">
+        <line x1="680" y1="412" x2="760" y2="412" stroke="#1345c9" stroke-width="1.4" marker-end="url(#a2c)"/>
+        <rect x="690" y="390" width="60" height="12" rx="2" fill="#ffffff"/>
+        <text x="720" y="399" fill="#1345c9" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">HOP+1</text>
+        <rect class="chip-r" x="712" y="405" width="16" height="14" rx="3" fill="#ffffff" stroke="#1345c9" stroke-width="0.8"/><text class="chip-t" x="720" y="415" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">4</text>
+      </g>
+      <g class="fe" data-s="5">
+        <path d="M 840,380 V 208 Q 840,200 832,200 H 556 Q 548,200 548,192 V 150" fill="none" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a2)"/>
+        <rect x="664" y="178" width="64" height="12" rx="2" fill="#ffffff"/>
+        <text x="696" y="187" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">RECALL</text>
+        <rect class="chip-r" x="688" y="193" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="696" y="203" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">5</text>
+      </g>
+      <g class="fe" data-s="6">
+        <line x1="620" y1="90" x2="700" y2="90" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a2)"/>
+        <rect x="636" y="68" width="48" height="12" rx="2" fill="#ffffff"/>
+        <text x="660" y="77" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">SPILL</text>
+        <rect class="chip-r" x="652" y="83" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="660" y="93" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">6</text>
+      </g>
+      <g class="fe" data-s="6">
+        <line x1="700" y1="120" x2="620" y2="120" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a2)"/>
+        <rect x="638" y="130" width="44" height="12" rx="2" fill="#ffffff"/>
+        <text x="660" y="139" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">FETCH</text>
+      </g>
+
+      <!-- 节点 -->
+      <rect x="380" y="60" width="240" height="90" rx="6" fill="#ffffff"/>
+      <rect x="380" y="60" width="240" height="90" rx="6" fill="#eaf0fd" stroke="#1345c9" stroke-width="1.4"/>
+      <rect x="388" y="66" width="40" height="12" rx="2" fill="transparent" stroke="rgba(19,69,201,0.4)" stroke-width="0.8"/>
+      <text x="408" y="75" fill="#1345c9" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">CACHE</text>
+      <text x="500" y="100" fill="#233065" font-size="13" font-weight="600" font-family="var(--sans)" text-anchor="middle">模型上下文窗口</text>
+      <text x="500" y="118" fill="#3a4680" font-size="8.5" font-family="var(--mono)" text-anchor="middle">Inline 摘要+ID · 窗口预算</text>
+      <text x="500" y="134" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">浪费窗口 = 浪费智能</text>
+
+      <rect x="700" y="60" width="200" height="90" rx="6" fill="#ffffff"/>
+      <rect x="700" y="60" width="200" height="90" rx="6" fill="rgba(35,48,101,0.05)" stroke="#7d88b4" stroke-width="1"/>
+      <rect x="708" y="66" width="40" height="12" rx="2" fill="transparent" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/>
+      <text x="728" y="75" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">STORE</text>
+      <text x="800" y="100" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">Spill 窗口外</text>
+      <text x="800" y="118" fill="#3a4680" font-size="8.5" font-family="var(--mono)" text-anchor="middle">完整内容 · 截断留引用</text>
+      <text x="800" y="134" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">工具按需续读</text>
+
+      <rect x="40" y="380" width="150" height="64" rx="6" fill="#ffffff"/>
+      <rect x="40" y="380" width="150" height="64" rx="6" fill="rgba(125,136,180,0.10)" stroke="#a9b3d4" stroke-width="1"/>
+      <rect x="48" y="386" width="40" height="12" rx="2" fill="transparent" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/>
+      <text x="68" y="395" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">EVENT</text>
+      <text x="115" y="416" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">Trigger #id</text>
+      <text x="115" y="432" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">摘要 + 关联 ID</text>
+
+      <rect x="270" y="380" width="160" height="64" rx="6" fill="#ffffff"/>
+      <rect x="270" y="380" width="160" height="64" rx="6" fill="#ffffff" stroke="#233065" stroke-width="1"/>
+      <rect x="278" y="386" width="48" height="12" rx="2" fill="transparent" stroke="rgba(35,48,101,0.4)" stroke-width="0.8"/>
+      <text x="302" y="395" fill="#3a4680" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">THREAD</text>
+      <text x="350" y="416" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">Thread #A</text>
+      <text x="350" y="432" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">内联 Worker session id</text>
+
+      <rect x="510" y="380" width="170" height="64" rx="6" fill="#ffffff"/>
+      <rect x="510" y="380" width="170" height="64" rx="6" fill="#ffffff" stroke="#233065" stroke-width="1"/>
+      <rect x="518" y="386" width="50" height="12" rx="2" fill="transparent" stroke="rgba(35,48,101,0.4)" stroke-width="0.8"/>
+      <text x="543" y="395" fill="#3a4680" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">WORKER</text>
+      <text x="595" y="416" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">Worker Session</text>
+      <text x="595" y="432" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">内联相关 thread id</text>
+
+      <rect x="760" y="380" width="160" height="64" rx="6" fill="#ffffff"/>
+      <rect x="760" y="380" width="160" height="64" rx="6" fill="rgba(35,48,101,0.05)" stroke="#7d88b4" stroke-width="1"/>
+      <rect x="768" y="386" width="48" height="12" rx="2" fill="transparent" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/>
+      <text x="792" y="395" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">THREAD</text>
+      <text x="840" y="416" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">Thread #B</text>
+      <text x="840" y="432" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">跨引用对象</text>
+
+      <line x1="30" y1="480" x2="930" y2="480" stroke="rgba(35,48,101,0.10)" stroke-width="0.8"/>
+      <text x="30" y="496" fill="#7d88b4" font-size="8" font-family="var(--mono)" letter-spacing="0.14em">LEGEND</text>
+      <rect x="100" y="488" width="12" height="12" rx="3" fill="#eaf0fd" stroke="#1345c9" stroke-width="1"/>
+      <text x="118" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">上下文窗口(有限)</text>
+      <rect x="218" y="488" width="12" height="12" rx="3" fill="rgba(35,48,101,0.05)" stroke="#7d88b4" stroke-width="1"/>
+      <text x="236" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">Spill / 引用对象</text>
+      <line x1="330" y1="494" x2="358" y2="494" stroke="#7d88b4" stroke-width="1.2"/>
+      <text x="364" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">引用跳转</text>
+      <line x1="422" y1="494" x2="450" y2="494" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="456" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">按需召回</text>
+      <line x1="528" y1="494" x2="556" y2="494" stroke="#1345c9" stroke-width="1.4"/>
+      <text x="562" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">链式召回路径</text>
+    </svg>
+
+    <!-- ════════ T3 两级事件过滤 ════════ -->
+    <svg id="svg-t3" class="svgpane" viewBox="0 0 960 520" role="img" aria-labelledby="t3-title t3-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="t3-title">两级事件过滤:Fast Path / Slow Path</title>
+      <desc id="t3-desc">环境事件先经程序层确定性规则快速滤除噪音,候选事件再交 LLM 语义层判断是否行动;需要行动的才进入 Router 分派。</desc>
+      <defs>
+        <marker id="a3" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#7d88b4"/></marker>
+        <marker id="a3c" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1345c9"/></marker>
+      </defs>
+      <rect width="960" height="520" fill="#ffffff"/>
+      <rect x="240" y="140" width="500" height="330" rx="8" fill="rgba(19,69,201,0.02)" stroke="rgba(19,69,201,0.10)" stroke-width="0.8"/>
+      <rect x="248" y="144" width="120" height="12" rx="2" fill="#ffffff"/>
+      <text x="308" y="153" fill="rgba(35,48,101,0.42)" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.14em">FILTER STAGE · 过滤层</text>
+
+      <g class="fe" data-s="1">
+        <line x1="180" y1="260" x2="260" y2="260" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a3)"/>
+        <rect x="186" y="238" width="58" height="12" rx="2" fill="#ffffff"/>
+        <text x="215" y="247" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">EVENTS</text>
+        <rect class="chip-r" x="212" y="253" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="220" y="263" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">1</text>
+      </g>
+      <g class="fe" data-s="2">
+        <line x1="340" y1="300" x2="340" y2="384" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a3)"/>
+        <rect x="348" y="334" width="44" height="12" rx="2" fill="#ffffff"/>
+        <text x="370" y="343" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">DROP</text>
+        <rect class="chip-r" x="332" y="335" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="340" y="345" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">2</text>
+      </g>
+      <g class="fe" data-s="3">
+        <line x1="420" y1="260" x2="520" y2="260" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a3)"/>
+        <rect x="434" y="238" width="72" height="12" rx="2" fill="#ffffff"/>
+        <text x="470" y="247" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">CANDIDATE</text>
+        <rect class="chip-r" x="462" y="253" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="470" y="263" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">3</text>
+      </g>
+      <g class="fe" data-s="4">
+        <line x1="680" y1="260" x2="780" y2="260" stroke="#1345c9" stroke-width="1.4" marker-end="url(#a3c)"/>
+        <rect x="700" y="238" width="60" height="12" rx="2" fill="#ffffff"/>
+        <text x="730" y="247" fill="#1345c9" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">ACT</text>
+        <rect class="chip-r" x="722" y="253" width="16" height="14" rx="3" fill="#ffffff" stroke="#1345c9" stroke-width="0.8"/><text class="chip-t" x="730" y="263" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">4</text>
+      </g>
+      <g class="fe" data-s="5">
+        <line x1="600" y1="300" x2="600" y2="384" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a3)"/>
+        <rect x="608" y="334" width="52" height="12" rx="2" fill="#ffffff"/>
+        <text x="634" y="343" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">QUIET</text>
+        <rect class="chip-r" x="592" y="335" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="600" y="345" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">5</text>
+      </g>
+
+      <!-- 节点 -->
+      <rect x="40" y="220" width="140" height="80" rx="6" fill="#ffffff"/>
+      <rect x="40" y="220" width="140" height="80" rx="6" fill="rgba(125,136,180,0.10)" stroke="#a9b3d4" stroke-width="1"/>
+      <rect x="48" y="226" width="34" height="12" rx="2" fill="transparent" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/>
+      <text x="65" y="235" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">IN</text>
+      <text x="110" y="258" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">环境事件流</text>
+      <text x="110" y="275" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">群聊·邮件·CI·评论</text>
+      <text x="110" y="289" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">高噪音 · 低触发率</text>
+
+      <rect x="260" y="220" width="160" height="80" rx="6" fill="#ffffff"/>
+      <rect x="260" y="220" width="160" height="80" rx="6" fill="#eaf0fd" stroke="#1345c9" stroke-width="1.4"/>
+      <rect x="268" y="226" width="54" height="12" rx="2" fill="transparent" stroke="rgba(19,69,201,0.4)" stroke-width="0.8"/>
+      <text x="295" y="235" fill="#1345c9" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">FAST PATH</text>
+      <text x="340" y="258" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">程序层规则</text>
+      <text x="340" y="275" fill="#3a4680" font-size="8.5" font-family="var(--mono)" text-anchor="middle">来源 / 群组 / 白名单</text>
+      <text x="340" y="289" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">确定性代码 · 零 LLM 成本</text>
+
+      <rect x="260" y="384" width="160" height="56" rx="6" fill="#ffffff"/>
+      <rect x="260" y="384" width="160" height="56" rx="6" fill="rgba(35,48,101,0.02)" stroke="rgba(35,48,101,0.30)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="340" y="408" fill="#3a4680" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">丢弃 · 噪音</text>
+      <text x="340" y="426" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">占事件流大多数</text>
+
+      <rect x="520" y="220" width="160" height="80" rx="6" fill="#ffffff"/>
+      <rect x="520" y="220" width="160" height="80" rx="6" fill="#ffffff" stroke="#233065" stroke-width="1"/>
+      <rect x="528" y="226" width="54" height="12" rx="2" fill="transparent" stroke="rgba(35,48,101,0.4)" stroke-width="0.8"/>
+      <text x="555" y="235" fill="#3a4680" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">SLOW PATH</text>
+      <text x="600" y="258" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">语义层策略</text>
+      <text x="600" y="275" fill="#3a4680" font-size="8.5" font-family="var(--mono)" text-anchor="middle">LLM + 上下文判断</text>
+      <text x="600" y="289" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">提示词即扩展点</text>
+
+      <rect x="520" y="384" width="160" height="56" rx="6" fill="#ffffff"/>
+      <rect x="520" y="384" width="160" height="56" rx="6" fill="rgba(35,48,101,0.02)" stroke="rgba(35,48,101,0.30)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="600" y="408" fill="#3a4680" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">保持安静</text>
+      <text x="600" y="426" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">不需介入 · 仅存候选</text>
+
+      <rect x="780" y="220" width="140" height="80" rx="6" fill="#ffffff"/>
+      <rect x="780" y="220" width="140" height="80" rx="6" fill="#ffffff" stroke="#233065" stroke-width="1"/>
+      <rect x="788" y="226" width="42" height="12" rx="2" fill="transparent" stroke="rgba(35,48,101,0.4)" stroke-width="0.8"/>
+      <text x="809" y="235" fill="#3a4680" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">ROUTE</text>
+      <text x="850" y="258" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">Router 分派</text>
+      <text x="850" y="275" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">仅处理需行动事件</text>
+
+      <line x1="30" y1="480" x2="930" y2="480" stroke="rgba(35,48,101,0.10)" stroke-width="0.8"/>
+      <text x="30" y="496" fill="#7d88b4" font-size="8" font-family="var(--mono)" letter-spacing="0.14em">LEGEND</text>
+      <rect x="100" y="488" width="12" height="12" rx="3" fill="#eaf0fd" stroke="#1345c9" stroke-width="1"/>
+      <text x="118" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">Fast Path(本图焦点)</text>
+      <rect x="248" y="488" width="12" height="12" rx="3" fill="rgba(35,48,101,0.02)" stroke="rgba(35,48,101,0.3)" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="266" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">不行动分支</text>
+      <line x1="352" y1="494" x2="380" y2="494" stroke="#7d88b4" stroke-width="1.2"/>
+      <text x="386" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">事件流</text>
+      <line x1="440" y1="494" x2="468" y2="494" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="474" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">滤除</text>
+      <line x1="530" y1="494" x2="558" y2="494" stroke="#1345c9" stroke-width="1.4"/>
+      <text x="564" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">行动路径</text>
+    </svg>
+
+    <!-- ════════ T4 投机执行 ════════ -->
+    <svg id="svg-t4" class="svgpane" viewBox="0 0 960 520" role="img" aria-labelledby="t4-title t4-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="t4-title">投机执行:后台预执行与结果取舍</title>
+      <desc id="t4-desc">环境信号出现时 Agent 在后台提前复现并寻找修复;结果有价值才交付给用户,否则丢弃并保持安静。</desc>
+      <defs>
+        <marker id="a4" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#7d88b4"/></marker>
+        <marker id="a4c" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1345c9"/></marker>
+      </defs>
+      <rect width="960" height="520" fill="#ffffff"/>
+      <rect x="230" y="120" width="300" height="260" rx="8" fill="rgba(19,69,201,0.02)" stroke="rgba(19,69,201,0.10)" stroke-width="0.8"/>
+      <rect x="238" y="124" width="150" height="12" rx="2" fill="#ffffff"/>
+      <text x="313" y="133" fill="rgba(35,48,101,0.42)" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.14em">BACKGROUND · 不打扰用户</text>
+
+      <g class="fe" data-s="1">
+        <line x1="190" y1="260" x2="290" y2="260" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a4)"/>
+        <rect x="212" y="238" width="56" height="12" rx="2" fill="#ffffff"/>
+        <text x="240" y="247" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">SIGNAL</text>
+        <rect class="chip-r" x="232" y="253" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="240" y="263" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">1</text>
+      </g>
+      <g class="fe" data-s="2">
+        <line x1="390" y1="300" x2="390" y2="396" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a4)"/>
+        <rect x="398" y="340" width="56" height="12" rx="2" fill="#ffffff"/>
+        <text x="426" y="349" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">SILENT</text>
+        <rect class="chip-r" x="382" y="341" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="390" y="351" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">2</text>
+      </g>
+      <g class="fe" data-s="3">
+        <line x1="490" y1="260" x2="600" y2="260" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a4)"/>
+        <rect x="520" y="238" width="50" height="12" rx="2" fill="#ffffff"/>
+        <text x="545" y="247" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">EVAL</text>
+        <rect class="chip-r" x="537" y="253" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="545" y="263" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">3</text>
+      </g>
+      <g class="fe" data-s="4">
+        <path d="M 720,240 H 760 Q 768,240 768,232 V 196 Q 768,188 776,188 H 790" fill="none" stroke="#1345c9" stroke-width="1.4" marker-end="url(#a4c)"/>
+        <rect x="716" y="196" width="52" height="12" rx="2" fill="#ffffff"/>
+        <text x="742" y="205" fill="#1345c9" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">VALUE</text>
+        <rect class="chip-r" x="760" y="225" width="16" height="14" rx="3" fill="#ffffff" stroke="#1345c9" stroke-width="0.8"/><text class="chip-t" x="768" y="235" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">4</text>
+      </g>
+      <g class="fe" data-s="5">
+        <path d="M 720,280 H 752 Q 760,280 760,288 V 320 Q 760,328 768,328 H 790" fill="none" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a4)"/>
+        <rect x="716" y="304" width="60" height="12" rx="2" fill="#ffffff"/>
+        <text x="746" y="313" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">DISCARD</text>
+        <rect class="chip-r" x="752" y="281" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="760" y="291" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">5</text>
+      </g>
+
+      <!-- 节点 -->
+      <rect x="40" y="220" width="150" height="80" rx="6" fill="#ffffff"/>
+      <rect x="40" y="220" width="150" height="80" rx="6" fill="rgba(125,136,180,0.10)" stroke="#a9b3d4" stroke-width="1"/>
+      <rect x="48" y="226" width="34" height="12" rx="2" fill="transparent" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/>
+      <text x="65" y="235" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">IN</text>
+      <text x="115" y="258" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">环境信号</text>
+      <text x="115" y="275" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">报 bug · 讨论改动</text>
+      <text x="115" y="289" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">邀约 · 待办消息</text>
+
+      <rect x="290" y="200" width="200" height="100" rx="6" fill="#ffffff"/>
+      <rect x="290" y="200" width="200" height="100" rx="6" fill="#eaf0fd" stroke="#1345c9" stroke-width="1.4"/>
+      <rect x="298" y="206" width="52" height="12" rx="2" fill="transparent" stroke="rgba(19,69,201,0.4)" stroke-width="0.8"/>
+      <text x="324" y="215" fill="#1345c9" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">SPECULATE</text>
+      <text x="390" y="244" fill="#233065" font-size="13" font-weight="600" font-family="var(--sans)" text-anchor="middle">Worker 后台预执行</text>
+      <text x="390" y="262" fill="#3a4680" font-size="8.5" font-family="var(--mono)" text-anchor="middle">静默复现 · 寻找修复</text>
+      <text x="390" y="280" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">额外算力 换 人的等待</text>
+
+      <rect x="300" y="396" width="180" height="56" rx="6" fill="#ffffff"/>
+      <rect x="300" y="396" width="180" height="56" rx="6" fill="rgba(35,48,101,0.02)" stroke="rgba(35,48,101,0.30)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="390" y="420" fill="#3a4680" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">全程保持安静</text>
+      <text x="390" y="438" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">过程不向用户发消息</text>
+
+      <rect x="600" y="220" width="120" height="80" rx="6" fill="#ffffff"/>
+      <rect x="600" y="220" width="120" height="80" rx="6" fill="#ffffff" stroke="#233065" stroke-width="1"/>
+      <rect x="608" y="226" width="40" height="12" rx="2" fill="transparent" stroke="rgba(35,48,101,0.4)" stroke-width="0.8"/>
+      <text x="628" y="235" fill="#3a4680" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">JUDGE</text>
+      <text x="660" y="258" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">结果判定</text>
+      <text x="660" y="275" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">有价值 ?</text>
+      <text x="660" y="289" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">简单修复 ?</text>
+
+      <rect x="790" y="150" width="150" height="76" rx="6" fill="#ffffff"/>
+      <rect x="790" y="150" width="150" height="76" rx="6" fill="#ffffff" stroke="#233065" stroke-width="1"/>
+      <rect x="798" y="156" width="36" height="12" rx="2" fill="transparent" stroke="rgba(35,48,101,0.4)" stroke-width="0.8"/>
+      <text x="816" y="165" fill="#3a4680" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">SHIP</text>
+      <text x="865" y="186" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">交付给用户</text>
+      <text x="865" y="203" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">修复 PR / 草稿 / 核对结果</text>
+
+      <rect x="790" y="296" width="150" height="64" rx="6" fill="#ffffff"/>
+      <rect x="790" y="296" width="150" height="64" rx="6" fill="rgba(35,48,101,0.02)" stroke="rgba(35,48,101,0.30)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="865" y="322" fill="#3a4680" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">丢弃结果</text>
+      <text x="865" y="340" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">未确认 · 继续安静</text>
+
+      <line x1="30" y1="480" x2="930" y2="480" stroke="rgba(35,48,101,0.10)" stroke-width="0.8"/>
+      <text x="30" y="496" fill="#7d88b4" font-size="8" font-family="var(--mono)" letter-spacing="0.14em">LEGEND</text>
+      <rect x="100" y="488" width="12" height="12" rx="3" fill="#eaf0fd" stroke="#1345c9" stroke-width="1"/>
+      <text x="118" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">投机执行(焦点)</text>
+      <rect x="226" y="488" width="12" height="12" rx="3" fill="rgba(35,48,101,0.02)" stroke="rgba(35,48,101,0.3)" stroke-width="1" stroke-dasharray="3,2"/>
+      <text x="244" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">静默/丢弃</text>
+      <line x1="330" y1="494" x2="358" y2="494" stroke="#7d88b4" stroke-width="1.2"/>
+      <text x="364" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">事件流</text>
+      <line x1="418" y1="494" x2="446" y2="494" stroke="#1345c9" stroke-width="1.4"/>
+      <text x="452" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">交付路径</text>
+      <line x1="528" y1="494" x2="556" y2="494" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="562" y="497" fill="#3a4680" font-size="8.5" font-family="var(--sans)">丢弃/静默</text>
+    </svg>
+
+    <!-- ════════ T5 存算分离与 BYOM ════════ -->
+    <svg id="svg-t5" class="svgpane" viewBox="0 0 960 560" role="img" aria-labelledby="t5-title t5-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="t5-title">存算分离:无状态 Agent Loop 与端侧执行环境</title>
+      <desc id="t5-desc">Agent Loop 做成云端无状态容器,会话状态存数据库;执行环境留在端侧,经轻量 daemon 接入,支持间歇在线设备;Watchdog 在外部巡检恢复。</desc>
+      <defs>
+        <marker id="a5" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#7d88b4"/></marker>
+        <marker id="a5c" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1345c9"/></marker>
+        <marker id="a5l" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+      </defs>
+      <rect width="960" height="560" fill="#ffffff"/>
+
+      <rect x="280" y="88" width="360" height="300" rx="8" fill="rgba(19,69,201,0.02)" stroke="rgba(19,69,201,0.10)" stroke-width="0.8"/>
+      <rect x="288" y="92" width="140" height="12" rx="2" fill="#ffffff"/>
+      <text x="358" y="101" fill="rgba(35,48,101,0.42)" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.14em">CLOUD · 存算分离</text>
+      <rect x="660" y="88" width="260" height="300" rx="8" fill="rgba(19,69,201,0.02)" stroke="rgba(19,69,201,0.10)" stroke-width="0.8"/>
+      <rect x="668" y="92" width="150" height="12" rx="2" fill="#ffffff"/>
+      <text x="743" y="101" fill="rgba(35,48,101,0.42)" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.14em">BYOM · 执行环境留在原地</text>
+
+      <g class="fe" data-s="1">
+        <line x1="480" y1="180" x2="520" y2="180" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a5)"/>
+        <rect x="466" y="152" width="56" height="12" rx="2" fill="#ffffff"/>
+        <text x="494" y="161" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">STATE</text>
+        <rect class="chip-r" x="486" y="173" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="494" y="183" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">1</text>
+      </g>
+      <g class="fe" data-s="2">
+        <line x1="400" y1="220" x2="400" y2="304" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a5)"/>
+        <rect x="352" y="256" width="76" height="12" rx="2" fill="#ffffff"/>
+        <text x="390" y="265" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">REPLACE</text>
+        <rect class="chip-r" x="392" y="262" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="400" y="272" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">2</text>
+      </g>
+      <g class="fe" data-s="3">
+        <path d="M 480,160 H 660 Q 668,160 668,152 V 146" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#a5l)"/>
+        <rect x="560" y="136" width="44" height="12" rx="2" fill="#ffffff"/>
+        <text x="582" y="145" fill="#2e5aa8" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">TOOL</text>
+        <rect class="chip-r" x="574" y="153" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="582" y="163" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">3</text>
+      </g>
+      <g class="fe" data-s="4">
+        <path d="M 480,180 H 620 Q 628,180 628,188 V 224 Q 628,232 636,232 H 660" fill="none" stroke="#1345c9" stroke-width="1.4" marker-end="url(#a5c)"/>
+        <rect x="560" y="208" width="52" height="12" rx="2" fill="#ffffff"/>
+        <text x="586" y="217" fill="#1345c9" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">TOOL</text>
+        <rect class="chip-r" x="620" y="225" width="16" height="14" rx="3" fill="#ffffff" stroke="#1345c9" stroke-width="0.8"/><text class="chip-t" x="628" y="235" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">4</text>
+      </g>
+      <g class="fe" data-s="5">
+        <path d="M 480,200 H 560 Q 568,200 568,208 V 292 Q 568,300 576,300 H 660" fill="none" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a5)"/>
+        <rect x="470" y="282" width="72" height="12" rx="2" fill="#ffffff"/>
+        <text x="506" y="291" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">ONLINE?</text>
+        <rect class="chip-r" x="560" y="293" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="568" y="303" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">5</text>
+      </g>
+      <g class="fe" data-s="6">
+        <line x1="560" y1="64" x2="560" y2="130" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a5)"/>
+        <rect x="568" y="88" width="52" height="12" rx="2" fill="#ffffff"/>
+        <text x="594" y="97" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">WATCH</text>
+        <rect class="chip-r" x="552" y="89" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="560" y="99" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">6</text>
+      </g>
+      <g class="fe" data-s="7">
+        <path d="M 320,340 H 300 Q 292,340 292,348 V 440 Q 292,448 300,448 H 660" fill="none" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#a5)"/>
+        <rect x="290" y="386" width="70" height="12" rx="2" fill="#ffffff"/>
+        <text x="325" y="395" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">RE-TRIG</text>
+        <rect class="chip-r" x="318" y="401" width="16" height="14" rx="3" fill="#ffffff" stroke="#b9c9ee" stroke-width="0.8"/><text class="chip-t" x="326" y="411" font-size="8" font-weight="600" font-family="var(--mono)" text-anchor="middle">7</text>
+      </g>
+
+      <!-- 节点 -->
+      <rect x="320" y="130" width="160" height="90" rx="6" fill="#ffffff"/>
+      <rect x="320" y="130" width="160" height="90" rx="6" fill="#eaf0fd" stroke="#1345c9" stroke-width="1.4"/>
+      <rect x="328" y="136" width="40" height="12" rx="2" fill="transparent" stroke="rgba(19,69,201,0.4)" stroke-width="0.8"/>
+      <text x="348" y="145" fill="#1345c9" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">LOOP</text>
+      <text x="400" y="172" fill="#233065" font-size="13" font-weight="600" font-family="var(--sans)" text-anchor="middle">Agent Loop</text>
+      <text x="400" y="190" fill="#3a4680" font-size="8.5" font-family="var(--mono)" text-anchor="middle">无状态弹性容器</text>
+      <text x="400" y="206" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">可重启 · 可替换</text>
+
+      <rect x="520" y="140" width="100" height="80" rx="6" fill="#ffffff"/>
+      <rect x="520" y="140" width="100" height="80" rx="6" fill="rgba(35,48,101,0.05)" stroke="#7d88b4" stroke-width="1"/>
+      <rect x="528" y="146" width="24" height="12" rx="2" fill="transparent" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/>
+      <text x="540" y="155" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.08em">DB</text>
+      <text x="570" y="180" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">状态库</text>
+      <text x="570" y="197" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">会话持久化</text>
+
+      <rect x="340" y="304" width="120" height="56" rx="6" fill="#ffffff"/>
+      <rect x="340" y="304" width="120" height="56" rx="6" fill="rgba(35,48,101,0.02)" stroke="rgba(35,48,101,0.30)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="400" y="326" fill="#3a4680" font-size="11" font-weight="600" font-family="var(--sans)" text-anchor="middle">水平扩容 ×N</text>
+      <text x="400" y="344" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">无状态即可替换</text>
+
+      <rect x="480" y="20" width="160" height="44" rx="6" fill="#ffffff"/>
+      <rect x="480" y="20" width="160" height="44" rx="6" fill="rgba(35,48,101,0.02)" stroke="rgba(35,48,101,0.30)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="560" y="40" fill="#3a4680" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">Watchdog</text>
+      <text x="560" y="55" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">外部控制回路</text>
+
+      <rect x="660" y="120" width="120" height="52" rx="6" fill="#ffffff"/>
+      <rect x="660" y="120" width="120" height="52" rx="6" fill="rgba(35,48,101,0.03)" stroke="rgba(35,48,101,0.30)" stroke-width="1"/>
+      <text x="720" y="142" fill="#233065" font-size="11" font-weight="600" font-family="var(--sans)" text-anchor="middle">daemon · 开发机</text>
+      <text x="720" y="160" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">未提交修改+凭据</text>
+
+      <rect x="660" y="206" width="120" height="52" rx="6" fill="#ffffff"/>
+      <rect x="660" y="206" width="120" height="52" rx="6" fill="rgba(35,48,101,0.03)" stroke="rgba(35,48,101,0.30)" stroke-width="1"/>
+      <text x="720" y="228" fill="#233065" font-size="11" font-weight="600" font-family="var(--sans)" text-anchor="middle">daemon · 个人电脑</text>
+      <text x="720" y="246" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">间歇在线</text>
+
+      <rect x="660" y="292" width="120" height="52" rx="6" fill="#ffffff"/>
+      <rect x="660" y="292" width="120" height="52" rx="6" fill="rgba(35,48,101,0.03)" stroke="rgba(35,48,101,0.30)" stroke-width="1"/>
+      <text x="720" y="314" fill="#233065" font-size="11" font-weight="600" font-family="var(--sans)" text-anchor="middle">云端托管机</text>
+      <text x="720" y="332" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">按需创建</text>
+
+      <rect x="660" y="410" width="200" height="76" rx="6" fill="#ffffff"/>
+      <rect x="660" y="410" width="200" height="76" rx="6" fill="rgba(35,48,101,0.03)" stroke="rgba(35,48,101,0.30)" stroke-width="1"/>
+      <text x="760" y="440" fill="#233065" font-size="11" font-weight="600" font-family="var(--sans)" text-anchor="middle">掉线设备重新上线</text>
+      <text x="760" y="458" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">云端自动补触发 · 完成任务</text>
+      <text x="760" y="474" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">无需守在设备旁</text>
+
+      <line x1="30" y1="524" x2="930" y2="524" stroke="rgba(35,48,101,0.10)" stroke-width="0.8"/>
+      <text x="30" y="540" fill="#7d88b4" font-size="8" font-family="var(--mono)" letter-spacing="0.14em">LEGEND</text>
+      <rect x="100" y="532" width="12" height="12" rx="3" fill="#eaf0fd" stroke="#1345c9" stroke-width="1"/>
+      <text x="118" y="541" fill="#3a4680" font-size="8.5" font-family="var(--sans)">无状态 Loop(焦点)</text>
+      <rect x="232" y="532" width="12" height="12" rx="3" fill="rgba(35,48,101,0.05)" stroke="#7d88b4" stroke-width="1"/>
+      <text x="250" y="541" fill="#3a4680" font-size="8.5" font-family="var(--sans)">持久化状态</text>
+      <rect x="322" y="532" width="12" height="12" rx="3" fill="rgba(35,48,101,0.03)" stroke="rgba(35,48,101,0.3)" stroke-width="1"/>
+      <text x="340" y="541" fill="#3a4680" font-size="8.5" font-family="var(--sans)">端侧环境</text>
+      <line x1="410" y1="538" x2="438" y2="538" stroke="#2e5aa8" stroke-width="1.2"/>
+      <text x="444" y="541" fill="#3a4680" font-size="8.5" font-family="var(--sans)">工具调用</text>
+      <line x1="510" y1="538" x2="538" y2="538" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="544" y="541" fill="#3a4680" font-size="8.5" font-family="var(--sans)">间歇/监控</text>
+    </svg>
+    </div>
+  </div>
+
+  <!-- 执行轨迹 -->
+  <div class="trace">
+    <div class="trace-h">
+      <div class="l">执行轨迹 <span class="c" id="traceIdx">01 / 06 · 一条事件的生命周期</span></div>
+      <div class="trace-ctl">
+        <button class="btn" id="speedBtn">1×</button>
+        <button class="btn" id="prevBtn">‹ 上一步</button>
+        <button class="btn play" id="playBtn">▶ 播放</button>
+        <button class="btn" id="nextBtn">下一步 ›</button>
+        <button class="btn" id="resetBtn">⟲</button>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th style="width:52px">步骤</th><th style="width:160px">事件</th><th style="width:300px">本步关系</th><th>状态观察</th></tr></thead>
+      <tbody id="traceBody"></tbody>
+    </table>
+    <div class="note" id="traceNote"></div>
+  </div>
+</div>
+
+    <!-- 右栏 -->
+    <div class="detail">
+      <div class="dt-h">机制详解 <span class="c" id="dtIdx"></span></div>
+      <div class="dt-tabs" id="dtTabs">
+        <span class="on" data-dt="0">机制</span><span data-dt="1">伪代码</span><span data-dt="2">出处</span>
+      </div>
+      <div class="dt-body" id="dtBody"></div>
+    </div>
+  </div>
+
+
+  <div class="foot">
+    <span>SUPER-AGENT EXPLORER · 交互式概念图解</span>
+    <span>风格参照 SYSTEMS EXPLORER · 数据源:DeepSeek Harness 团队《Super-agent 设计探索》</span>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ════════ 数据 ════════ */
+const SRC_CARDS = `
+  <div class="src-card"><div class="t">Super-agent 设计探索:迈向更自主的 Agent 系统 ↗</div>
+  <div class="s">DeepSeek Harness 团队 · 微信公众号 2026-10-31<br>本页为其对应章节的图解化。</div></div>
+  <div class="src-card"><div class="t">dsh-superagent-prototype ↗</div>
+  <div class="s">GitHub 原型仓库(技术验证插件,非正式产品)。</div></div>`;
+
+const TOPICS = [
+{
+  group:0, name:"双层架构与订阅直通", en:"ROUTER · WORKER · THREAD",
+  eyebrow:"SUPER-AGENT & EVENT-DRIVING", ghost:"01", svg:"svg-t1",
+  dcSub:"事件流 · 请求传递", stepLabel:"一条事件的生命周期",
+  lead:`单会话 ReAct Loop 里,<b>连续性</b>与<b>吞吐</b>互斥:所有事件进同一个会话上下文最连续但串行慢,每条事件各开会话则上下文割裂。双层架构把「全局连续性」交给常驻的 <b>Router 层</b>,把「并发执行」交给上下文隔离的 <b>Worker 层</b>——Session 从用户的认知负担,降回系统的实现细节。`,
+  facts:[
+    ["12.4 min","消融实验 p50 任务完成时间(单会话最优 15.7)"],
+    ["−37%","订阅直通为 Router 节省的读缓存 token"],
+    ["6.4→1.6 s","批处理下单个决定的分摊推理时间"]],
+  scenes:[
+    {name:"主流程", capTitle:"订阅直通 —— 本图的关键一步", cap:"Worker 建立订阅后,同一 Thread 的后续事件由程序直接送达,不再经过 Router 转发。原文实验:去掉直通后任务完成时间不变,但 Router 决定量增加约 30%、读缓存 token 上升约 37%——直通的作用是为全局节点省推理开销,而不是提速。", dim:[], hot:[]},
+    {name:"对照 · 去掉直通", capTitle:"去掉直通:所有事件回流 Router", cap:"关掉订阅直通后(DIRECT 路径熄灭),同一 Thread 的每条后续事件都要重新经 Router 调用工具转发。任务完成时间几乎不变,但 Router 的读缓存 token 从 2323 万涨到 3177 万——单点全局节点白白多花 37% 推理开销。", dim:[4], hot:[3,6]}],
+  steps:[
+    {t:"事件进入信道", ev:"TRIGGER", rel:"用户/群聊/CI → 信道入口", obs:"触发器入队,等待过滤", cap:"用户在 IM、GitHub、邮件等熟悉信道里发消息,或 CI 产生运行结果——这些半结构化事件统称为 Trigger,是系统的主要输入,不再依赖人类逐条敲提示词。"},
+    {t:"两级过滤去噪", ev:"FILTER", rel:"程序规则 → 语义层(如需)", obs:"噪音在此被滤掉;候选事件才耗 LLM", cap:"真实事件流高噪音、低触发率。程序层(Fast Path)用确定性代码检查来源/群组/白名单,滤掉大部分无关消息;候选事件才交语义层 LLM 判断——详见主题 03。"},
+    {t:"路由分派 + 订阅", ev:"ROUTE + SUBSCRIBE", rel:"Router → Worker;Router → 订阅表", obs:"冷启动分派;Worker 订阅该 Thread", cap:"Router 层是常驻的全局序点:判断新事件归属、创建 Worker Session 分派任务,并让 Worker 订阅对应 Thread。Router 只分派不执行,轻量模型即可胜任。"},
+    {t:"后续事件直通", ev:"DIRECT", rel:"订阅表 → Worker(同 Thread 后续事件)", obs:"绕过 Router 直通,省 ~37% 读缓存 token", cap:"订阅是多对多关系:同一 PR/话题的后续事件由程序直发所有订阅它的 Worker,不经 Router。多个订阅同一 Thread 的 Worker 借此互相感知,自行消解冲突。"},
+    {t:"执行与状态落库", ev:"EXEC + WRITE", rel:"Worker → 端侧 daemon;Worker → 状态库", obs:"start() 立即返回不阻塞;状态持久化", cap:"Worker 经端侧 daemon 在用户真实环境(未提交修改、本地凭据所在处)执行;start() 异步调用立即返回,结果作为新事件回投——前台对话不被后台任务卡住。会话状态落库,与无状态计算分离。"},
+    {t:"汇报并统一回复", ev:"REPORT + REPLY", rel:"Worker → Router → 信道", obs:"Worker 不直接对人;Router 统一回复", cap:"Worker 不与人类直接交互——冗长推理和工具调用隔离在 Worker 内部,关键结论汇报给 Router,由 Router 按信道规范统一回复(IM ≤100 词,GitHub 结构化交付),避免多会话各自回复的混乱。"}],
+  note:"芯片 ①–⑥ 与左栏步骤、图中连线一一对应;虚线为异步/回报路径。",
+  mech:`<h4>为什么拆两层</h4>
+    <p>单会话 ReAct Loop 里,连续性与吞吐互斥:全走一个会话上下文最连续但串行慢,每条事件各开会话则上下文割裂。Router 层只承接交互与分派(可轻模型),Worker 层隔离上下文并发执行(强模型),用户面对的始终是"同一个" Agent。</p>
+    <h4>关键设计点</h4>
+    <ul><li><b>两级过滤</b>:程序规则(Fast Path)先滤掉大部分噪音,候选事件才交 LLM(Slow Path)。</li>
+    <li><b>订阅直通</b>:Thread↔Worker 多对多订阅,后续事件直发;订阅同一 Thread 的多个 Worker 借此互相感知、自行消解冲突。</li>
+    <li><b>Router 批处理</b>:拥堵时积压 Trigger 合并进一次调用,单决定成本随批变大而降。</li>
+    <li><b>异步 ReAct</b>:Worker 调 <code>start()</code> 立即返回,结果作为新事件回投——前台不阻塞。</li></ul>
+    <div class="kv"><span class="k">§7.1</span><span>消融:p50 完成时间 12.4min vs 单会话+subagent 最优 15.7min</span></div>
+    <div class="kv"><span class="k">§7.2</span><span>压测:Trigger 1→40 条/分,batch 1.0→2.8,单决定 6.4s→1.6s</span></div>`,
+  code:`on trigger(t):
+  if fast_path_reject(t): drop      # 程序层过滤
+  if subscribed(t.thread): → worker  # 直通,不经 LLM
+  batch += t
+on flush(batch):
+  for t in batch: decide(t)         # 语义层合并分派
+    → spawn_worker(t) or route(t)`,
+  src:SRC_CARDS
+},
+{
+  group:0, name:"上下文组织与链式召回", en:"INLINE & SPILL",
+  eyebrow:"CONTEXT AS CACHE", ghost:"02", svg:"svg-t2",
+  dcSub:"上下文 · 局部性", stepLabel:"一次链式召回",
+  lead:`系统输入从有限的人类提示词变成环境持续产生的事件后,<b>注入多少信息</b>成了新问题:太多挤占窗口、稀释注意力,太少则模型反复调工具浪费步数。原文把上下文窗口当 <b>Cache</b> 管:大概率用到的 <b>Inline</b> 进窗口,超长/低频的 <b>Spill</b> 到窗外留引用——对象用 ID 织成引用图,模型沿引用<b>逐跳召回</b>。`,
+  facts:[
+    ["ID + 摘要","最小注入单元:先给引用,不给全文"],
+    ["局部性","与 CPU Cache 同一思想:时空相邻者优先 Inline"],
+    ["多跳","Trigger→Thread→Worker→Thread 沿引用图展开"]],
+  scenes:[
+    {name:"主流程", capTitle:"链式召回 —— Router 的长程记忆", cap:"每个对象召回时都内联下一跳关联对象的 ID,模型从当前事件出发沿引用图按需展开:Trigger→所在 Thread→关联 Worker→另一个评审 Thread。Router 不必把所有历史塞进窗口,也能在用户跨信道提起旧任务时找回上下文。", dim:[], hot:[]},
+    {name:"对照 · 全量注入", capTitle:"如果不做 Inline & Spill", cap:"把每个事件的完整内容直接塞进上下文:窗口迅速被长文本占满,稀释模型对当前任务的注意力;而只注入 ID 不给摘要,模型每一步都要调工具读取,执行步数翻倍。Inline & Spill 就是在这两个极端之间做缓存替换策略。", dim:[1,2,3,4,5], hot:[6]}],
+  steps:[
+    {t:"最小注入", ev:"INJECT", rel:"Trigger → 上下文窗口", obs:"只给对象 ID + 内容摘要", cap:"事件进窗口时只注入最小集:对象 ID 和摘要(如消息前 50 字)。这是缓存的「缓存行装入」——先占位,需要细节再取。"},
+    {t:"内联关联对象", ev:"INLINE", rel:"Trigger → Thread #A", obs:"附紧密关联对象的 ID 与前后文", cap:"利用局部性逐步 Inline:附上所在 Thread 的 ID、IM 消息的前后相邻消息、代码评论的相邻评论——时空相邻的信息大概率马上要用,提前装进窗口省一次往返。"},
+    {t:"沿引用逐跳", ev:"NEXT ID", rel:"Thread #A → Worker Session", obs:"召回结果本身带下一跳引用", cap:"Thread 对象内联了处理它的 Worker Session ID。每次召回的返回都遵循同样的 Inline & Spill,于是引用图可以一跳一跳走下去。"},
+    {t:"跨引用跳转", ev:"HOP+1", rel:"Worker → Thread #B", obs:"跳到另一个关联评审讨论", cap:"Worker 内联了它关联的另一个 Thread——比如正在处理的 PR。模型顺着 ID 跳到跨对象的上下文,无需全局索引。"},
+    {t:"召回回窗口", ev:"RECALL", rel:"Thread #B → 上下文窗口", obs:"按需把展开的内容带回上下文", cap:"链路尽头的对象把摘要和关联信息带回窗口——这就是「链式召回(Chain of Recall)」,缓解 Router 在长程运行中丢失先前信息的问题。"},
+    {t:"溢出与续读", ev:"SPILL + FETCH", rel:"窗口 ⇄ Spill 存储", obs:"超长截断留入口;工具按需读取", cap:"装不下的长内容截断、把完整版留在窗口外的 Spill 区,只保留续读入口。模型判断需要全文时调工具拉回——Cache miss 走存储层取数。"}],
+  note:"下方为对象引用图,上方为上下文窗口与 Spill 区的交换;虚线为按需召回。",
+  mech:`<h4>为什么把上下文当 Cache</h4>
+    <p>注入过多会挤占窗口、稀释注意力;注入过少迫使模型反复调工具。「浪费上下文窗口,就是浪费模型的智能。」Inline & Spill 是这套缓存的装入与换出:近期可能用的内联,超预算的溢出留引用。</p>
+    <h4>局部性原则</h4>
+    <ul><li><b>最小注入</b>:先给 ID+摘要,不给全文。</li>
+    <li><b>时空相邻优先</b>:消息的前后消息、评论的相邻评论、紧密关联对象的 ID。</li>
+    <li><b>超限则 Spill</b>:截断保留续读入口,模型按需调工具读全文。</li>
+    <li><b>引用图</b>:Trigger/Thread/Worker 各有唯一 ID,召回结果内联下一跳 ID——构成可多跳展开的图。</li></ul>`,
+  code:`inject(trigger):
+  window += { id: trigger.id, summary: head(trigger) }
+  window += { id: trigger.thread_id }        # 内联关联 ID
+  if len(item) > LIMIT:
+    spill[item.id] = item                    # 溢出窗外
+    window += { id: item.id, ref: "续读→" }
+# 链式召回:recall(obj) 的返回同样内联 next_id`,
+  src:SRC_CARDS
+},
+{
+  group:1, name:"两级事件过滤", en:"FAST / SLOW PATH",
+  eyebrow:"EVENT FILTERING", ghost:"03", svg:"svg-t3",
+  dcSub:"事件流 · 两级过滤", stepLabel:"一批事件的过滤",
+  lead:`接入真实群聊与代码平台后,事件流呈「高噪音、低触发率」——绝大多数消息不需要 Agent 介入。若每条都调 LLM 判断,延迟和算力都撑不住。原文借 <b>Fast Path / Slow Path</b> 思想:已明确的高频判断固化为<b>确定性代码</b>做快速准入,只有需要语义理解的候选才交给模型。`,
+  facts:[
+    ["≈7%","原文实验:300 条消息中约 20 条是工作请求"],
+    ["0 LLM","程序层过滤不消耗任何模型调用"],
+    ["NL 开关","语义层用提示词写策略,随加随改"]],
+  scenes:[
+    {name:"主流程", capTitle:"两级过滤 —— 噪音在进模型前消失", cap:"程序层先按确定性条件(来源、群组、用户/机器人白名单)做准入:不同来源分别设「仅响应明确请求」「作为候选」「直接忽略」。通过准入的候选才进语义层,由 LLM 结合上下文判断是否行动。", dim:[], hot:[]},
+    {name:"对照 · 全部进 LLM", capTitle:"如果每条事件都过模型", cap:"语义层变成所有流量的必经之路:延迟上升、算力成本不可承受,Router 的上下文窗口也被无关事件塞满。两级结构的意义正在于把「确定性能答的」从「需要语义判断的」里拆出去。", dim:[2,5], hot:[1,3,4]}],
+  steps:[
+    {t:"事件流进入", ev:"EVENTS", rel:"群聊/邮件/CI → 过滤层", obs:"高噪音、低触发率", cap:"接入真实环境后,绝大多数消息与 Agent 无关——闲聊、表情、别人的对话。过滤层是事件进入系统的第一道闸门。"},
+    {t:"程序层准入", ev:"DROP", rel:"规则检查 → 丢弃", obs:"来源/白名单不符直接滤除", cap:"确定性代码做 Fast Path:按事件来源、群组范围、用户/机器人白名单快速准入——「仅响应明确请求」「作为候选」「直接忽略」三档策略,在调模型前滤掉大部分。"},
+    {t:"候选事件放行", ev:"CANDIDATE", rel:"程序层 → 语义层", obs:"只剩需要语义判断的少数", cap:"过了程序层的事件才是真正需要理解的候选——量级已经小了一个数量级,值得花 LLM 推理。"},
+    {t:"语义层判定行动", ev:"ACT", rel:"语义层 → Router 分派", obs:"需行动的事件进入调度", cap:"LLM 按提示词编写的策略+上下文判断是否要行动。语义层同时是自然语言扩展点:新策略就是一段新提示词,随写随生效。"},
+    {t:"其余保持安静", ev:"QUIET", rel:"语义层 → 不介入", obs:"无需行动的事件被放过", cap:"判断无需介入的事件静默流过——「需要时行动,不需要时保持安静」是主动性的另一半。"}],
+  note:"DROP/QUIET 两个虚线出口是事件的主流归宿;只有 ACT 一路通向 Router。",
+  mech:`<h4>设计动机</h4>
+    <p>「高噪音、低触发率」的事件流下,每条都过 LLM 会让延迟和算力不可承受。把已经明确且稳定的高频判断固化成代码(Fast Path),把需要语义理解的留给模型(Slow Path)——与网络设备转发面的设计同源。</p>
+    <h4>两级各管什么</h4>
+    <ul><li><b>程序层</b>:来源、群组、白名单等确定性条件;三档准入策略;零 LLM 成本。</li>
+    <li><b>语义层</b>:提示词策略+上下文判断是否行动;同时是自然语言策略扩展点,随时开关新增。</li></ul>
+    <p>此结构同样用于事件路由(主题 01 的订阅直通):已归属事件程序直发,未归属的才走 Router。</p>`,
+  code:`fn fast_path(e) -> Verdict:
+  match source(e):
+    case "team-channel": return CANDIDATE   # 候选
+    case "bot-flood":    return IGNORE      # 直接忽略
+    case "dm":           return ACT_IF_MENTIONED
+fn slow_path(e, ctx) -> Action:
+  # 提示词策略 + 上下文 → act | quiet
+  return llm_judge(POLICY_PROMPT, e, ctx)`,
+  src:SRC_CARDS
+},
+{
+  group:1, name:"投机执行", en:"SPECULATION",
+  eyebrow:"SPECULATIVE EXECUTION", ghost:"04", svg:"svg-t4",
+  dcSub:"后台 · 预执行", stepLabel:"一次投机执行",
+  lead:`借鉴 CPU 的<b>投机执行</b>:还不确定结果会不会被采用时,根据环境信号在后台先跑——用额外的后台算力换人的等待与介入成本。<b>有价值就交付,没价值就丢弃</b>,全程不打扰用户。`,
+  facts:[
+    ["静默复现","内部用户群的实测策略:先复现找修复,再决定是否交付"],
+    ["PR 先行","群内还在讨论方案时,修复 PR 已在后台提交"],
+    ["安静退出","未确认或无简单修复 → 丢弃,全程无消息"]],
+  scenes:[
+    {name:"主流程", capTitle:"投机执行 —— 主动性的燃料", cap:"收到会议邀约先核对日程、备好回复草稿;群里有人报 bug,先在后台复现并找修复方案——确认问题且找到简单修复后才交付 PR,否则全程安静。人看到的不是「开始工作」而是「已完成待验收」。", dim:[], hot:[]},
+    {name:"分支 · 结果无价值", capTitle:"丢弃分支:失败也无声", cap:"投机天然允许失败——后台尝试没复现出问题、或修复不简单,结果直接丢弃,用户甚至不知道发生过这次尝试。成本是后台算力,收益是「有备而来」时的零等待。", dim:[4], hot:[5]}],
+  steps:[
+    {t:"捕获环境信号", ev:"SIGNAL", rel:"群聊/邮件 → 后台 Worker", obs:"无需人 @ 即可启动", cap:"群里有人反馈问题、讨论改动方案,或邮件里来了会议邀约——这些信号触发后台预执行,不要求任何人明确下达指令。"},
+    {t:"后台静默执行", ev:"SILENT", rel:"Worker → 本地环境", obs:"复现 + 找修复,不发消息", cap:"Worker 在后台尝试复现问题、搜集资料、起草方案。关键约束:全程静默,过程不产生任何面向用户的消息。"},
+    {t:"结果价值判定", ev:"EVAL", rel:"Worker → 结果判定", obs:"确认问题?有简单修复?", cap:"投机结果的验收门:真的复现出问题了吗?修复方案足够简单可靠吗?——原文的「静默复现并修复」策略设的就是这个双条件。"},
+    {t:"有价值则交付", ev:"VALUE", rel:"判定 → 交付给用户", obs:"修复 PR / 回复草稿 / 核对结果", cap:"通过判定才把结果交付:直接附上修复 PR、拟好的回复草稿、或核对过的日程冲突。人类介入点从「执行」上移到「验收」。"},
+    {t:"无价值则丢弃", ev:"DISCARD", rel:"判定 → 保持安静", obs:"尝试沉没,用户无感", cap:"没复现出来、方案不简单——结果丢弃,回到安静。代价只是后台算力,这正是投机执行的赌博本质。"}],
+  note:"BACKGROUND 区内执行全程不向用户发消息;只有 VALUE 一支通向用户。",
+  mech:`<h4>思想来源</h4>
+    <p>投机执行(Speculative Execution):不确定结果是否被采用时,根据环境信号后台提前尝试,消耗额外算力减少人的等待与介入成本。有价值就交付,没价值就丢弃。</p>
+    <h4>两个落地场景</h4>
+    <ul><li><b>个人助手</b>:收到邀约邮件 → 后台核对日程冲突、搜集背景、备回复草稿,用户过目即可发出。</li>
+    <li><b>研发协作</b>:内部用户群配置「静默复现并修复」——讨论还在进行,修复 PR 已在后台提交;仅在确认问题+找到简单修复时才交付。</li></ul>
+    <p>它与事件过滤配合:过滤决定「值不值得看」,投机决定「值不值得先干」。</p>`,
+  code:`on signal(s):                       # 无需 @
+  w = spawn(background=true, quiet=true)
+  r = w.try_reproduce_and_fix(s)
+  if r.confirmed and r.simple_fix:
+    deliver(r.pr, to=user)          # 交付验收
+  else:
+    discard(r)                      # 静默丢弃`,
+  src:SRC_CARDS
+},
+{
+  group:2, name:"存算分离与 BYOM", en:"STATELESS LOOP · CONTROL LOOP",
+  eyebrow:"ALWAYS-ON INFRASTRUCTURE", ghost:"05", svg:"svg-t5",
+  dcSub:"部署 · 存算分离", stepLabel:"一次跨设备任务",
+  lead:`本地 Agent 把「推进 Loop 的计算、要持久化的会话状态、执行环境」绑在同一台设备上——设备一休眠,Agent 就死。解法借<b>存算分离</b>分两步解绑:Loop 做成云端<b>无状态容器</b>、状态进数据库(5.1);执行环境留在原地,端侧只装<b>轻量 daemon</b> 执行命令回传结果(5.2)。再配外部 <b>Watchdog</b> 控制回路盯进展。`,
+  facts:[
+    ["BYOM","Bring Your Own Machine:日常开发机直接接入"],
+    ["间歇在线","设备重新上线后,云端自动补触发完成任务"],
+    ["脑手分离","与 Anthropic 同名思想:harness 无状态,环境经接口接入"]],
+  scenes:[
+    {name:"主流程", capTitle:"存算分离 —— 持久在线的地基", cap:"Loop 无状态 → 可水平扩展、重启、替换,连续性由持久化存储保障;环境不上云 → 未提交修改、私有凭据、内网依赖都留在原地,daemon 只执行命令回传结果。两者合起来,Agent 摆脱单台设备的生命周期。", dim:[], hot:[]},
+    {name:"场景 · 设备掉线", capTitle:"间歇在线设备:上线即补执行", cap:"个人电脑合盖离线时,云端 Agent Loop 照常运行(状态在库里);设备重新上线后,云端自动补触发,让 daemon 完成必须在这台机器上执行的步骤——左下角 RE-TRIG 路径。", dim:[3,4], hot:[5,7]}],
+  steps:[
+    {t:"状态落库", ev:"STATE", rel:"Agent Loop ⇄ 状态库", obs:"会话/任务持久化在 DB", cap:"无状态的第一块:要持久的只是会话状态,进数据库;推进 Loop 的计算做成无状态容器。"},
+    {t:"容器可替换", ev:"REPLACE", rel:"Loop → 副本/扩容", obs:"重启替换不丢连续性", cap:"无状态容器可以水平扩展、随时重启或替换——崩溃不再等于任务丢失,连续性由存储层兜住。"},
+    {t:"工具调用发端侧", ev:"TOOL", rel:"Loop → daemon·开发机", obs:"命令在真实环境执行", cap:"执行环境不上云:端侧轻量 daemon 不存会话状态,只执行命令返回结果——未提交修改、本地凭据都在用户自己的机器上。"},
+    {t:"多机择境执行", ev:"TOOL", rel:"Loop → daemon·个人电脑", obs:"按任务需要选执行环境", cap:"一个 Agent 不再受限于单台机器:在不同执行设备间切换,按任务需要选择环境——开发机、个人电脑、云托管机都经同一 daemon 接口接入。"},
+    {t:"间歇设备等待", ev:"ONLINE?", rel:"Loop → 离线设备(挂起)", obs:"任务挂起等设备上线", cap:"对间歇在线的设备,云端 Loop 记住「这台机器上还有事」——不靠设备在线,靠状态库记住。"},
+    {t:"Watchdog 巡检", ev:"WATCH", rel:"Watchdog → Loop/Worker", obs:"进程活着≠任务在推进", cap:"主系统外的独立控制回路:除基础设施故障,还由模型判断各 Worker 是否有实质进展、是否偏离目标;它本身是完整 Agent,可用自然语言问故障、在线改规则。"},
+    {t:"上线补触发", ev:"RE-TRIG", rel:"重新上线 → 自动完成", obs:"设备回来后任务收口", cap:"设备重新上线,云端自动补触发,daemon 执行遗留步骤,任务在用户不在场的情况下收口——这就是「持久」的完整含义。"}],
+  note:"两区即两步解绑:CLOUD 区管计算+状态,BYOM 区管执行;虚线为监控与间歇路径。",
+  mech:`<h4>两步解绑</h4>
+    <ul><li><b>5.1 计算与状态分离</b>:Loop 进云端无状态容器,会话状态进 DB——摆脱单机生命周期。</li>
+    <li><b>5.2 计算与环境分离</b>:真实环境(未提交修改/凭据/内网依赖)难以复制,就不上云;端侧 daemon 只执行不存状态,Agent 按需读取环境上下文。</li></ul>
+    <h4>Watchdog 为什么要在系统外</h4>
+    <p>持久在线的分布式系统很难靠主系统内部逻辑保证长期可靠;且许多异常不是进程崩溃,而是模型陷入无效循环或偏离目标——所以 Watchdog 盯的是「进展」不是「存活」。它本身是 Agent Session,可以自然语言问故障、在线修提示词。</p>
+    <h4>遗留风险(原文 §8.4)</h4>
+    <p>云端 Loop 一旦被攻破,其连接的全部端侧设备都面临被控制风险;凭据进入上下文也有泄露面——需要「Agent 用凭据但不接触凭据」的机制。</p>`,
+  code:`# 端侧 daemon 极简形态
+loop:
+  cmd = poll(cloud_agent)     # 不存会话状态
+  out = run(cmd, env=local)   # 本地真实环境
+  push(cloud_agent, out)
+# Watchdog(定时消息驱动)
+on tick:
+  for w in workers:
+    if not progress(w) or drift(w):
+      intervene(w)            # 可问、可改、可修`,
+  src:SRC_CARDS
+}
+];
+
+/* ════════ 状态 ════════ */
+const S = { topic:0, scene:0, step:0, playing:false, timer:null, speed:1, visited:new Set([0]), dt:0 };
+const $ = id => document.getElementById(id);
+const cur = () => TOPICS[S.topic];
+
+/* ════════ 渲染 ════════ */
+function renderTOC(){
+  const groups = [["01 / 系统结构"],["02 / 事件驱动"],["03 / 持久在线"]];
+  let html = "";
+  groups.forEach((g,gi)=>{
+    const items = TOPICS.map((t,i)=>({t,i})).filter(x=>x.t.group===gi);
+    html += `<div class="tg"><div class="tg-h">${g[0]}&nbsp;&nbsp;${items.length}</div>`;
+    items.forEach(({t,i})=>{
+      const cls = ["ti", i===S.topic?"active":"", S.visited.has(i)&&i!==S.topic?"done":""].join(" ");
+      html += `<div class="${cls}" data-ti="${i}"><span class="dot"></span><div>${t.name}<span class="en">${t.en}</span></div></div>`;
+    });
+    html += `</div>`;
+  });
+  $("tocGroups").innerHTML = html;
+  document.querySelectorAll(".ti").forEach(el=>el.onclick=()=>{ gotoTopic(+el.dataset.ti); });
+  filterTOC($("searchBox").value);
+}
+function filterTOC(q){
+  q = (q||"").trim().toLowerCase();
+  document.querySelectorAll(".ti").forEach(el=>{
+    el.style.display = !q || el.textContent.toLowerCase().includes(q) ? "" : "none";
+  });
+}
+function renderTopic(){
+  const t = cur();
+  $("crumbStep").innerHTML = `正在探索&nbsp;&nbsp;${String(S.topic+1).padStart(2,"0")} / 05`;
+  $("crumbTitle").textContent = t.name;
+  $("topicEyebrow").textContent = t.eyebrow;
+  $("topicTitle").textContent = t.name;
+  $("ghostNum").textContent = t.ghost;
+  $("topicLead").innerHTML = t.lead;
+  $("dtIdx").textContent = `${t.ghost} / ${["系统结构","系统结构","事件驱动","事件驱动","持久在线"][S.topic]}`;
+  $("dcSub").textContent = t.dcSub;
+  $("tocFoot").textContent = `5 个主题 · ${t.steps.length} 步主流程`;
+  $("traceIdx").textContent = `01 / ${String(t.steps.length).padStart(2,"0")} · ${t.stepLabel}`;
+  $("traceNote").textContent = t.note;
+  // facts
+  $("factRow").innerHTML = t.facts.map(f=>`<div class="fact"><div class="v">${f[0]}</div><div class="k">${f[1]}</div></div>`).join("");
+  // scenes
+  $("sceneList").innerHTML = t.scenes.map((s,i)=>`<div class="scene${i===S.scene?" on":""}" data-sc="${i}">${s.name}</div>`).join("");
+  document.querySelectorAll(".scene").forEach(el=>el.onclick=()=>{ S.scene=+el.dataset.sc; stopPlay(); renderScene(); });
+  // steps sidebar
+  $("stepList").innerHTML = t.steps.map((s,i)=>`<div class="st" data-st="${i}"><span class="num">${i+1}</span>${s.t}</div>`).join("");
+  document.querySelectorAll(".st").forEach(el=>el.onclick=()=>{ stopPlay(); setStep(+el.dataset.st); });
+  // svg panes
+  document.querySelectorAll(".svgpane").forEach(p=>p.classList.toggle("on", p.id===t.svg));
+  // trace table
+  $("traceBody").innerHTML = t.steps.map((s,i)=>
+    `<tr data-tr="${i}"><td${i===0?"":' class="dim"'}><span class="num">${i+1}</span></td><td class="ev">${s.ev}</td><td>${s.rel}</td><td>${s.obs}</td></tr>`).join("");
+  // group tabs
+  document.querySelectorAll("#groupTabs .tab").forEach(el=>el.classList.toggle("active", +el.dataset.g===t.group));
+  // progress
+  $("progTxt").innerHTML = `<b>${S.visited.size} / 5</b>`;
+  $("progBar").style.width = (S.visited.size/5*100)+"%";
+  renderScene(); renderDetail();
+}
+function renderScene(){
+  const sc = cur().scenes[S.scene];
+  $("dcScene").textContent = "场景 ▸ " + sc.name;
+  document.querySelectorAll("#sceneList .scene").forEach((el,i)=>el.classList.toggle("on", i===S.scene));
+  applyStep(); // re-applies dim/hot incl. scene overrides
+}
+function renderDetail(){
+  const t = cur();
+  const panes = [
+    t.mech,
+    `<h4>${t.name} · 伪代码</h4><div class="code">${t.code}</div><h4>要点回顾</h4><ul>${t.steps.map(s=>`<li><b>${s.ev}</b> — ${s.obs}</li>`).join("")}</ul>`,
+    `<div class="src"><div class="sh">出处 · 延伸阅读</div>${t.src}</div>`
+  ];
+  $("dtBody").innerHTML = panes[S.dt];
+  document.querySelectorAll("#dtTabs span").forEach((el,i)=>el.classList.toggle("on", i===S.dt));
+}
+function applyStep(){
+  const t = cur(), sc = t.scenes[S.scene];
+  const pane = document.getElementById(t.svg);
+  pane.querySelectorAll(".fe").forEach(g=>{
+    const s = +g.dataset.s;
+    g.classList.remove("dim","hot");
+    if (sc.dim.includes(s)) g.classList.add("dim");
+    if (sc.hot.includes(s)) g.classList.add("hot");
+  });
+  // 步骤推进态
+  if (S.step > 0){
+    pane.querySelectorAll(".fe").forEach(g=>{
+      const s = +g.dataset.s;
+      g.classList.remove("dim","hot");
+      if (s < S.step) {/* 已完成:正常 */}
+      else if (s === S.step) g.classList.add("hot");
+      else g.classList.add("dim");
+      if (sc.dim.includes(s) && s!==S.step) g.classList.add("dim");
+    });
+  }
+  // trace rows
+  document.querySelectorAll("#traceBody tr").forEach((tr,i)=>{
+    const n = i+1;
+    tr.classList.toggle("on", n===Math.max(S.step,0) && S.step>0);
+    tr.classList.toggle("done-step", S.step>0 && n<S.step);
+    tr.querySelector("td").classList.toggle("dim", !(S.step>0 && n<S.step) && n!==Math.max(S.step,1));
+  });
+  // sidebar steps
+  document.querySelectorAll(".st").forEach((el,i)=>el.classList.toggle("cur", i===S.step-1));
+  // caption
+  const cap = $("capBox");
+  if (S.step>0){
+    const st = t.steps[S.step-1];
+    cap.classList.add("hot");
+    $("capNum").textContent = S.step;
+    $("capTitle").textContent = st.t;
+    $("capText").textContent = st.cap;
+  } else {
+    cap.classList.remove("hot");
+    $("capNum").textContent = "◆";
+    $("capTitle").textContent = sc.capTitle;
+    $("capText").textContent = sc.cap;
+  }
+  $("prevBtn").disabled = S.step<=0;
+  $("nextBtn").disabled = S.step>=t.steps.length;
+}
+function setStep(n){
+  S.step = Math.max(0, Math.min(n, cur().steps.length));
+  applyStep();
+}
+function gotoTopic(i){
+  stopPlay();
+  S.topic = i; S.scene = 0; S.step = 0; S.dt = 0;
+  S.visited.add(i);
+  renderTOC(); renderTopic();
+}
+function stopPlay(){
+  S.playing = false;
+  if (S.timer){ clearInterval(S.timer); S.timer=null; }
+  $("playBtn").textContent = "▶ 播放";
+}
+function tick(){
+  if (S.step >= cur().steps.length){ stopPlay(); return; }
+  setStep(S.step+1);
+}
+/* ════════ 事件绑定 ════════ */
+$("playBtn").onclick = ()=>{
+  if (S.playing){ stopPlay(); return; }
+  if (S.step >= cur().steps.length) setStep(0);
+  S.playing = true;
+  $("playBtn").textContent = "❚❚ 暂停";
+  S.timer = setInterval(tick, 1600/S.speed);
+};
+$("nextBtn").onclick = ()=>{ stopPlay(); setStep(S.step+1); };
+$("prevBtn").onclick = ()=>{ stopPlay(); setStep(S.step-1); };
+$("resetBtn").onclick = ()=>{ stopPlay(); setStep(0); };
+$("speedBtn").onclick = ()=>{
+  S.speed = S.speed===1?2:S.speed===2?4:1;
+  $("speedBtn").textContent = S.speed+"×";
+  if (S.playing){ clearInterval(S.timer); S.timer=setInterval(tick,1600/S.speed); }
+};
+$("searchBox").oninput = e=>filterTOC(e.target.value);
+document.querySelectorAll("#groupTabs .tab").forEach(el=>{
+  el.onclick = ()=>{
+    const g = +el.dataset.g;
+    const first = TOPICS.findIndex(t=>t.group===g);
+    if (first>=0) gotoTopic(first);
+  };
+});
+document.querySelectorAll("#dtTabs span").forEach(el=>{
+  el.onclick = ()=>{ S.dt=+el.dataset.dt; renderDetail(); };
+});
+document.addEventListener("keydown", e=>{
+  if (e.target.tagName==="INPUT") return;
+  if (e.code==="Space"){ e.preventDefault(); $("playBtn").click(); }
+  if (e.key==="ArrowRight") $("nextBtn").click();
+  if (e.key==="ArrowLeft") $("prevBtn").click();
+});
+/* 初始化 */
+renderTOC(); renderTopic();
+</script>
+</body>
+</html>
