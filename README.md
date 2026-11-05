@@ -9,6 +9,12 @@ mechanism / pseudocode / source detail panel.
 
 **5 topics** · 双层架构与订阅直通 · 上下文组织与链式召回 · 两级事件过滤 · 投机执行 · 存算分离与 BYOM
 
+Each topic carries a **plain-language analogy (小白解读)** and a **real-world
+scenario walkthrough (真实场景)** so non-experts can follow along.
+
+Responsive down to phones: columns collapse into a single reading flow, the
+architecture diagram and trace table scroll horizontally with an on-screen hint.
+
 Keyboard: `Space` play/pause · `←`/`→` step.
 
 Single self-contained `index.html` — no build step, no dependencies.
