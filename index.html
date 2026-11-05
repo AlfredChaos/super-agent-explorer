@@ -76,8 +76,18 @@
   .demo{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;position:relative;overflow:hidden;display:flex;flex-direction:column}
   .demo-top{display:flex;justify-content:space-between;align-items:center}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-  .seg span{padding:5px 11px;font-size:11px;color:var(--muted)}
+  .seg span{padding:5px 11px;font-size:11px;color:var(--muted);cursor:pointer}
   .seg span.on{background:var(--blue);color:#fff;font-weight:600}
+
+  /* ════════ 知识图谱视图 ════════ */
+  .kg-card{display:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .kg-card .kg-sub{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.1em;margin-top:6px}
+  body[data-view="kg"] .demo,body[data-view="kg"] .diagram-card,body[data-view="kg"] .trace{display:none}
+  body[data-view="kg"] .kg-card{display:block}
+  .kg-wrap{margin-top:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:10px;background:#fff}
+  .kg-svg{display:block;width:100%;min-width:980px;height:auto}
+  .kgn{cursor:pointer}
+  .kgn:hover .n-hot,.kgn:hover .n-ex,.kgn:hover .n-st,.kgn:hover .n-nv{stroke-width:2.6}
   .demo-tag{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.1em}
   .eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:var(--muted);margin-top:14px;text-transform:uppercase}
   h1.title{font-size:21px;font-weight:700;margin-top:4px}
@@ -249,7 +259,7 @@
     <!-- 中栏 -->
     <div class="demo">
       <div class="demo-top">
-        <div class="seg"><span class="on">◈ 机制演示</span><span id="segMap" style="cursor:default">⛓ 知识图谱</span></div>
+        <div class="seg"><span class="on" data-mode="demo">◈ 机制演示</span><span data-mode="kg">⛓ 知识图谱</span></div>
         <div class="demo-tag">教学模型 · 抽象节点 非物理拓扑</div>
       </div>
       <div class="eyebrow" id="topicEyebrow"></div>
@@ -878,6 +888,159 @@
     </div>
     <div class="note" id="traceNote"></div>
   </div>
+
+  <!-- 知识图谱:全部对象关系总览,点击节点跳主题 -->
+  <div class="kg-card">
+    <div class="demo-top">
+      <div class="seg"><span data-mode="demo">◈ 机制演示</span><span class="on" data-mode="kg">⛓ 知识图谱</span></div>
+      <div class="demo-tag">对象关系总览 · 点击节点跳转对应主题</div>
+    </div>
+    <div class="eyebrow">GLOBAL OBJECT GRAPH</div>
+    <h1 class="title">系统对象关系图谱</h1>
+    <div class="kg-sub">节点右上数字 = 所属主题编号;点击任意节点 → 跳到它的机制演示</div>
+    <div class="kg-wrap">
+    <svg id="svg-kg" class="kg-svg" viewBox="0 0 1140 560" role="img" aria-labelledby="kg-title kg-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="kg-title">Super-agent 对象关系图谱</title>
+      <desc id="kg-desc">五主题全部对象的全景关系:信道与定时触发产生 Trigger,经两级过滤到 Router;Router 经订阅表分派给 Worker,Worker 写状态库、调用端侧 daemon 与 LLM;Thread 归属 Worker,事件挂载其上;回报统一由 Router 回复信道。</desc>
+      <defs>
+        <marker id="ak" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#7d88b4"/></marker>
+        <marker id="akb" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1345c9"/></marker>
+        <marker id="akr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto-start-reverse"><polygon points="0 0, 8 3, 0 6" fill="#7d88b4"/></marker>
+      </defs>
+      <rect width="1140" height="560" fill="#ffffff"/>
+      <rect x="196" y="96" width="684" height="364" rx="8" fill="rgba(19,69,201,0.02)" stroke="rgba(19,69,201,0.10)" stroke-width="0.8"/>
+      <text x="560" y="111" fill="rgba(35,48,101,0.42)" font-size="7" font-family="var(--mono)" letter-spacing="0.14em">CLOUD · 云端无状态(05 存算分离)</text>
+      <rect x="900" y="96" width="240" height="364" rx="8" fill="rgba(19,69,201,0.02)" stroke="rgba(19,69,201,0.10)" stroke-width="0.8"/>
+      <text x="928" y="111" fill="rgba(35,48,101,0.42)" font-size="7" font-family="var(--mono)" letter-spacing="0.14em">DEVICE · 用户设备(05)</text>
+
+      <!-- ══ 边 ══ -->
+      <line x1="152" y1="235" x2="232" y2="235" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#ak)"/>
+      <rect x="162" y="212" width="60" height="12" rx="2" fill="#fff"/><text x="192" y="221" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">TRIGGER</text>
+      <line x1="300" y1="170" x2="300" y2="200" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ak)"/>
+      <rect x="308" y="180" width="72" height="12" rx="2" fill="#fff"/><text x="344" y="189" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">CRON 唤醒</text>
+      <line x1="376" y1="235" x2="416" y2="235" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#ak)"/>
+      <rect x="379" y="220" width="34" height="12" rx="2" fill="#fff"/><text x="396" y="229" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">候选</text>
+      <line x1="460" y1="276" x2="460" y2="300" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#akr)" marker-start="url(#akr)"/>
+      <rect x="468" y="280" width="64" height="12" rx="2" fill="#fff"/><text x="500" y="289" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle">读/写订阅</text>
+      <line x1="568" y1="235" x2="664" y2="235" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#ak)"/>
+      <rect x="596" y="220" width="48" height="12" rx="2" fill="#fff"/><text x="620" y="229" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">SPAWN</text>
+      <path d="M 584,326 H 652 Q 660,326 660,318 V 284 Q 660,276 668,276 H 700" fill="none" stroke="#1345c9" stroke-width="1.6" marker-end="url(#akb)"/>
+      <rect x="604" y="308" width="106" height="12" rx="2" fill="#fff"/><text x="657" y="317" fill="#1345c9" font-size="8.5" font-weight="600" font-family="var(--mono)" text-anchor="middle">同 THREAD 直通 DIRECT</text>
+      <line x1="560" y1="394" x2="660" y2="394" stroke="#7d88b4" stroke-width="1"/>
+      <rect x="584" y="378" width="34" height="12" rx="2" fill="#fff"/><text x="601" y="387" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle">归属</text>
+      <path d="M 660,394 V 286 Q 660,276 670,276 H 720" fill="none" stroke="#7d88b4" stroke-width="1" marker-end="url(#ak)"/>
+      <line x1="790" y1="276" x2="790" y2="440" stroke="#7d88b4" stroke-width="1.2" marker-end="url(#ak)"/>
+      <rect x="798" y="344" width="42" height="12" rx="2" fill="#fff"/><text x="819" y="353" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">WRITE</text>
+      <path d="M 625,440 V 276 H 568" fill="none" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ak)"/>
+      <rect x="600" y="414" width="50" height="12" rx="2" fill="#fff"/><text x="625" y="423" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">RESUME</text>
+      <line x1="816" y1="235" x2="960" y2="235" stroke="#2e5aa8" stroke-width="1.4" marker-end="url(#akb)"/>
+      <rect x="842" y="212" width="92" height="12" rx="2" fill="#fff"/><text x="888" y="221" fill="#2e5aa8" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">跨边界 EXEC</text>
+      <line x1="1020" y1="260" x2="1020" y2="300" stroke="#2e5aa8" stroke-width="1.4" marker-end="url(#akb)"/>
+      <rect x="1028" y="266" width="50" height="12" rx="2" fill="#fff"/><text x="1053" y="275" fill="#2e5aa8" font-size="8" font-family="var(--mono)" text-anchor="middle">工具调用</text>
+      <path d="M 720,180 V 148 H 492 Q 484,148 484,156 V 180" fill="none" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ak)"/>
+      <rect x="584" y="128" width="50" height="12" rx="2" fill="#fff"/><text x="609" y="137" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">REPORT</text>
+      <path d="M 430,180 V 148 H 96 Q 96,148 96,156 V 200" fill="none" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#ak)"/>
+      <rect x="228" y="134" width="40" height="12" rx="2" fill="#fff"/><text x="248" y="143" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle" letter-spacing="0.06em">REPLY</text>
+      <path d="M 300,392 V 500 H 980" fill="none" stroke="#7d88b4" stroke-width="1" stroke-dasharray="3,4" marker-end="url(#ak)"/>
+      <rect x="306" y="440" width="42" height="12" rx="2" fill="#fff"/><text x="327" y="449" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle">轻模型</text>
+      <rect x="306" y="500" width="120" height="12" rx="2" fill="#fff"/><text x="366" y="509" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle">事件挂载 · 引用图</text>
+      <line x1="840" y1="276" x2="840" y2="518" stroke="#7d88b4" stroke-width="1" stroke-dasharray="3,4"/>
+      <line x1="840" y1="518" x2="980" y2="518" stroke="#7d88b4" stroke-width="1" stroke-dasharray="3,4" marker-end="url(#ak)"/>
+      <rect x="850" y="464" width="42" height="12" rx="2" fill="#fff"/><text x="871" y="473" fill="#7d88b4" font-size="8" font-family="var(--mono)" text-anchor="middle">强模型</text>
+
+      <!-- ══ 节点 ══ -->
+      <g class="kgn" data-t="0"><title>信道入口 · Trigger 产生处;两级过滤从这里把关(主题 02)</title>
+        <rect x="40" y="200" width="112" height="70" rx="6" fill="#fff"/><rect class="n-nv" x="40" y="200" width="112" height="70" rx="6" fill="rgba(125,136,180,0.06)" stroke="#a9b3d4" stroke-width="1" stroke-dasharray="5,4"/>
+        <rect x="48" y="207" width="24" height="12" rx="2" fill="none" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/><text x="60" y="216" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle">EXT</text>
+        <text x="96" y="240" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">用户与信道</text>
+        <text x="96" y="256" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">IM · GH · MAIL · CI</text>
+        <text x="144" y="264" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="end">02</text></g>
+      <g class="kgn" data-t="2"><title>定时触发器 · 云端常驻,自主唤醒 Loop(主题 05 持久在线 / 02 过滤)</title>
+        <rect x="232" y="100" width="136" height="70" rx="6" fill="#fff"/><rect class="n-nv" x="232" y="100" width="136" height="70" rx="6" fill="rgba(125,136,180,0.06)" stroke="#a9b3d4" stroke-width="1" stroke-dasharray="5,4"/>
+        <rect x="240" y="107" width="28" height="12" rx="2" fill="none" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/><text x="254" y="116" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle">CRON</text>
+        <text x="300" y="140" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">定时触发器</text>
+        <text x="300" y="156" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">云端常驻 · 自主唤醒</text>
+        <text x="360" y="164" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="end">05</text></g>
+      <g class="kgn" data-t="2"><title>两级过滤 · Fast Path 程序规则 → Slow Path LLM 语义判断(主题 03)</title>
+        <rect x="232" y="200" width="144" height="64" rx="6" fill="#fff"/><rect class="n-ex" x="232" y="200" width="144" height="64" rx="6" fill="#fff" stroke="#233065" stroke-width="1.2"/>
+        <rect x="240" y="206" width="38" height="12" rx="2" fill="none" stroke="rgba(35,48,101,0.4)" stroke-width="0.8"/><text x="259" y="215" fill="#3a4680" font-size="7" font-family="var(--mono)" text-anchor="middle">FILTER</text>
+        <text x="304" y="238" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">两级过滤</text>
+        <text x="304" y="254" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">程序规则 → 语义判断</text>
+        <text x="368" y="258" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="end">03</text></g>
+      <g class="kgn" data-t="0"><title>Router 层 · 常驻轻模型,全局序点;只分派不执行(主题 01)</title>
+        <rect x="416" y="180" width="152" height="96" rx="6" fill="#fff"/><rect class="n-hot" x="416" y="180" width="152" height="96" rx="6" fill="#eaf0fd" stroke="#1345c9" stroke-width="1.4"/>
+        <rect x="424" y="186" width="44" height="12" rx="2" fill="none" stroke="rgba(19,69,201,0.4)" stroke-width="0.8"/><text x="446" y="195" fill="#1345c9" font-size="7" font-family="var(--mono)" text-anchor="middle">ROUTER</text>
+        <text x="492" y="224" fill="#233065" font-size="13" font-weight="600" font-family="var(--sans)" text-anchor="middle">Router 层</text>
+        <text x="492" y="241" fill="#3a4680" font-size="8.5" font-family="var(--mono)" text-anchor="middle">常驻 · 轻模型 · 全局序点</text>
+        <text x="492" y="257" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">只分派,不执行</text>
+        <text x="560" y="270" fill="#1345c9" font-size="7" font-family="var(--mono)" text-anchor="end">01</text></g>
+      <g class="kgn" data-t="0"><title>Worker 层 ×N · 上下文隔离,强模型;投机执行在这里发生(主题 01 / 04)</title>
+        <rect x="664" y="180" width="152" height="96" rx="6" fill="#fff"/><rect class="n-ex" x="664" y="180" width="152" height="96" rx="6" fill="#fff" stroke="#233065" stroke-width="1.2"/>
+        <rect x="672" y="186" width="44" height="12" rx="2" fill="none" stroke="rgba(35,48,101,0.4)" stroke-width="0.8"/><text x="694" y="195" fill="#3a4680" font-size="7" font-family="var(--mono)" text-anchor="middle">WORKER</text>
+        <text x="740" y="224" fill="#233065" font-size="13" font-weight="600" font-family="var(--sans)" text-anchor="middle">Worker 层 ×N</text>
+        <text x="740" y="241" fill="#3a4680" font-size="8.5" font-family="var(--mono)" text-anchor="middle">上下文隔离 · 强模型</text>
+        <text x="740" y="257" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">投机执行在这里发生</text>
+        <text x="808" y="270" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="end">01 · 04</text></g>
+      <g class="kgn" data-t="0"><title>订阅表 · Thread → Worker 多对多;直通的开关(主题 01)</title>
+        <rect x="400" y="300" width="128" height="52" rx="6" fill="#fff"/><rect class="n-st" x="400" y="300" width="128" height="52" rx="6" fill="rgba(35,48,101,0.05)" stroke="#7d88b4" stroke-width="1"/>
+        <rect x="408" y="306" width="24" height="12" rx="2" fill="none" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/><text x="420" y="315" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle">MAP</text>
+        <text x="464" y="332" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">订阅表</text>
+        <text x="464" y="346" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">Thread → Worker</text>
+        <text x="520" y="348" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="end">01</text></g>
+      <g class="kgn" data-t="1"><title>Thread · 上下文单元,事件挂载其上;Inline/Spill + 链式召回(主题 02)</title>
+        <rect x="400" y="368" width="160" height="52" rx="6" fill="#fff"/><rect class="n-st" x="400" y="368" width="160" height="52" rx="6" fill="rgba(35,48,101,0.05)" stroke="#7d88b4" stroke-width="1"/>
+        <rect x="408" y="374" width="38" height="12" rx="2" fill="none" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/><text x="427" y="383" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle">THREAD</text>
+        <text x="480" y="400" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">Thread · 上下文单元</text>
+        <text x="480" y="414" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">Inline / Spill · 链式召回</text>
+        <text x="552" y="416" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="end">02</text></g>
+      <g class="kgn" data-t="4"><title>状态库 · Loop 持久化;云端无状态的锚点(主题 05)</title>
+        <rect x="560" y="440" width="130" height="60" rx="6" fill="#fff"/><rect class="n-st" x="560" y="440" width="130" height="60" rx="6" fill="rgba(35,48,101,0.05)" stroke="#7d88b4" stroke-width="1"/>
+        <rect x="568" y="447" width="18" height="12" rx="2" fill="none" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/><text x="577" y="456" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle">DB</text>
+        <text x="625" y="472" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">状态库</text>
+        <text x="625" y="488" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">Loop 持久化</text>
+        <text x="682" y="494" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="end">05</text></g>
+      <g class="kgn" data-t="0"><title>LLM 服务 · 外部模型;轻模型给 Router、强模型给 Worker(主题 01)</title>
+        <rect x="980" y="470" width="150" height="56" rx="6" fill="#fff"/><rect class="n-nv" x="980" y="470" width="150" height="56" rx="6" fill="rgba(125,136,180,0.06)" stroke="#a9b3d4" stroke-width="1" stroke-dasharray="5,4"/>
+        <rect x="988" y="477" width="24" height="12" rx="2" fill="none" stroke="rgba(125,136,180,0.4)" stroke-width="0.8"/><text x="1000" y="486" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="middle">EXT</text>
+        <text x="1055" y="500" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">LLM 服务</text>
+        <text x="1055" y="516" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">轻模型 / 强模型</text>
+        <text x="1122" y="522" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="end">01</text></g>
+      <g class="kgn" data-t="4"><title>daemon · 端侧守护进程;BYOM,设备上线即接管任务(主题 05)</title>
+        <rect x="960" y="200" width="120" height="60" rx="6" fill="#fff"/><rect class="n-ex" x="960" y="200" width="120" height="60" rx="6" fill="#fff" stroke="#233065" stroke-width="1.2"/>
+        <rect x="968" y="206" width="42" height="12" rx="2" fill="none" stroke="rgba(35,48,101,0.4)" stroke-width="0.8"/><text x="989" y="215" fill="#3a4680" font-size="7" font-family="var(--mono)" text-anchor="middle">DAEMON</text>
+        <text x="1020" y="234" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">端侧 daemon</text>
+        <text x="1020" y="250" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">BYOM · 本地执行</text>
+        <text x="1072" y="256" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="end">05</text></g>
+      <g class="kgn" data-t="4"><title>本地环境 · 未提交改动 / 私有凭据 / 内网,不上云(主题 05)</title>
+        <rect x="960" y="300" width="120" height="60" rx="6" fill="#fff"/><rect class="n-nv" x="960" y="300" width="120" height="60" rx="6" fill="rgba(35,48,101,0.03)" stroke="rgba(35,48,101,0.35)" stroke-width="1"/>
+        <rect x="968" y="306" width="36" height="12" rx="2" fill="none" stroke="rgba(35,48,101,0.4)" stroke-width="0.8"/><text x="986" y="315" fill="#3a4680" font-size="7" font-family="var(--mono)" text-anchor="middle">LOCAL</text>
+        <text x="1020" y="334" fill="#233065" font-size="12" font-weight="600" font-family="var(--sans)" text-anchor="middle">本地环境</text>
+        <text x="1020" y="350" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="middle">文件 · 凭据 · 内网</text>
+        <text x="1072" y="356" fill="#7d88b4" font-size="7" font-family="var(--mono)" text-anchor="end">05</text></g>
+
+      <line x1="30" y1="536" x2="1110" y2="536" stroke="rgba(35,48,101,0.10)" stroke-width="0.8"/>
+      <text x="30" y="552" fill="#7d88b4" font-size="8" font-family="var(--mono)" letter-spacing="0.14em">LEGEND</text>
+      <rect x="104" y="543" width="12" height="12" rx="3" fill="#eaf0fd" stroke="#1345c9" stroke-width="1"/>
+      <text x="122" y="552" fill="#3a4680" font-size="8.5" font-family="var(--sans)">焦点模块</text>
+      <rect x="176" y="543" width="12" height="12" rx="3" fill="#fff" stroke="#233065" stroke-width="1"/>
+      <text x="194" y="552" fill="#3a4680" font-size="8.5" font-family="var(--sans)">执行模块</text>
+      <rect x="248" y="543" width="12" height="12" rx="3" fill="rgba(35,48,101,0.05)" stroke="#7d88b4" stroke-width="1"/>
+      <text x="266" y="552" fill="#3a4680" font-size="8.5" font-family="var(--sans)">状态存储</text>
+      <rect x="322" y="543" width="12" height="12" rx="3" fill="rgba(125,136,180,0.06)" stroke="#a9b3d4" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="340" y="552" fill="#3a4680" font-size="8.5" font-family="var(--sans)">外部 / 环境</text>
+      <line x1="408" y1="549" x2="436" y2="549" stroke="#7d88b4" stroke-width="1.2"/>
+      <text x="442" y="552" fill="#3a4680" font-size="8.5" font-family="var(--sans)">同步</text>
+      <line x1="472" y1="549" x2="500" y2="549" stroke="#7d88b4" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="506" y="552" fill="#3a4680" font-size="8.5" font-family="var(--sans)">异步 / 回报</text>
+      <line x1="572" y1="549" x2="604" y2="549" stroke="#1345c9" stroke-width="1.6"/>
+      <text x="610" y="552" fill="#3a4680" font-size="8.5" font-family="var(--sans)">直通快路径</text>
+      <line x1="672" y1="549" x2="704" y2="549" stroke="#2e5aa8" stroke-width="1.4"/>
+      <text x="710" y="552" fill="#3a4680" font-size="8.5" font-family="var(--sans)">跨边界工具调用</text>
+      <text x="1110" y="552" fill="#7d88b4" font-size="8.5" font-family="var(--mono)" text-anchor="end">点击节点 → 对应主题</text>
+    </svg>
+    </div>
+    <div class="scroll-hint">← 左右滑动查看完整图谱 →</div>
+  </div>
 </div>
 
     <!-- 右栏 -->
@@ -1103,7 +1266,7 @@ on tick:
 ];
 
 /* ════════ 状态 ════════ */
-const S = { topic:0, scene:0, step:0, playing:false, timer:null, speed:1, visited:new Set([0]), dt:0 };
+const S = { topic:0, scene:0, step:0, playing:false, timer:null, speed:1, visited:new Set([0]), dt:0, view:"demo" };
 const $ = id => document.getElementById(id);
 const cur = () => TOPICS[S.topic];
 
@@ -1231,8 +1394,14 @@ function setStep(n){
   S.step = Math.max(0, Math.min(n, cur().steps.length));
   applyStep();
 }
+function setView(m){
+  S.view = m;
+  document.body.dataset.view = m;
+  document.querySelectorAll(".seg span[data-mode]").forEach(s=>s.classList.toggle("on", s.dataset.mode===m));
+}
 function gotoTopic(i){
   stopPlay();
+  if (S.view==="kg") setView("demo");
   S.topic = i; S.scene = 0; S.step = 0; S.dt = 0;
   S.visited.add(i);
   renderTOC(); renderTopic();
@@ -1279,7 +1448,15 @@ document.addEventListener("keydown", e=>{
   if (e.key==="ArrowRight") $("nextBtn").click();
   if (e.key==="ArrowLeft") $("prevBtn").click();
 });
+/* 视图切换:机制演示 <-> 知识图谱 */
+document.querySelectorAll(".seg span[data-mode]").forEach(el=>{
+  el.onclick = ()=>setView(el.dataset.mode);
+});
+document.querySelectorAll("#svg-kg .kgn").forEach(el=>{
+  el.onclick = ()=>{ gotoTopic(+el.dataset.t); };
+});
 /* 初始化 */
+setView("demo");
 renderTOC(); renderTopic();
 </script>
 </body>
